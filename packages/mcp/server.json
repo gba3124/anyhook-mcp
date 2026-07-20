@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.gba3124/mcp",
+  "description": "Webhook operations for AI agents \u2014 zero-config: the anyhook_quickstart tool creates a free relay endpoint + API key with no signup. Inspect events, replay deliveries, mock signed payloads, verify signatures, directly from Claude / Cursor / Claude Code.",
+  "version": "0.2.0",
+  "homepage": "https://anyhook.net",
+  "repository": {
+    "url": "https://github.com/gba3124/anyhook-mcp",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "packages": [
+    {
+      "registryName": "npm",
+      "name": "anyhook-mcp",
+      "version": "0.2.0",
+      "runtimeHint": "npx",
+      "transportType": "stdio",
+      "environmentVariables": [
+        {
+          "name": "ANYHOOK_API_KEY",
+          "description": "Personal API key from anyhook.net/dashboard/settings/api-keys. Starts with ahk_live_. When set, tools query the live account; when absent, tools operate on an in-memory store for local dev.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "ANYHOOK_API_BASE",
+          "description": "Override the API base URL. Defaults to https://www.anyhook.net. Used by self-hosted AnyHook installations.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

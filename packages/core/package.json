@@ -1,0 +1,30 @@
+{
+  "name": "@anyhook/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "AnyHook core \u2014 signature verification, mock generation, event store, forwarder.",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts",
+    "./signature": "./src/signature/index.ts",
+    "./mock": "./src/mock/index.ts",
+    "./store": "./src/store/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gba3124/anyhook-mcp.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/gba3124/anyhook-mcp/issues"
+  }
+}
