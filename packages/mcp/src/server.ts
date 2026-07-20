@@ -79,7 +79,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     opts.client ?? (config.mode === "remote" && config.apiKey ? new AnyHookClient(config) : null);
 
   const server = new McpServer(
-    { name: "anyhook", version: "0.2.0" },
+    { name: "anyhook", version: "0.2.2" },
     { capabilities: { tools: {} } }
   );
 

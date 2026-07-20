@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-07-20
+
+### Added
+
+- Zero-config remote endpoint: the same server is hosted at `https://anyhook.net/mcp` (streamable HTTP). Connect from claude.ai connectors, ChatGPT, or any HTTP client with `{ "url": "https://anyhook.net/mcp" }` — nothing to install.
+- `api_key` argument on account tools, so a keyless HTTP session can carry the key returned by `anyhook_quickstart` (the stateless transport can't hold it).
+
+### Changed
+
+- All outbound requests now send an explicit `User-Agent`: mocked webhooks carry realistic provider UAs (`Stripe/1.0…`, `GitHub-Hookshot`, `Slackbot 1.0…`); the API client and quickstart send `anyhook-mcp/x`. Avoids edge bot filters (e.g. Cloudflare Bot Fight Mode) that reject bare library user-agents.
+
 ## [0.1.0] — 2026-05-25
 
 Initial release.
