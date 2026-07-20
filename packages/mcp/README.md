@@ -107,6 +107,23 @@ Or edit `~/.claude/mcp.json` directly with the same structure as above.
 
 ---
 
+## Remote endpoint (no local process)
+
+The same server is hosted at `https://anyhook.net/mcp` (streamable HTTP,
+stateless). Use it from claude.ai custom connectors, ChatGPT, or any client
+that speaks HTTP — nothing to install:
+
+```json
+{ "mcpServers": { "anyhook": { "url": "https://anyhook.net/mcp" } } }
+```
+
+Auth per request: send `Authorization: Bearer ahk_live_...`, or connect
+keyless and call `anyhook_quickstart` — it returns an `api_key` you then pass
+as an argument on account tool calls (the transport is stateless, so the
+session can't hold it for you).
+
+---
+
 ## Local-only mode (no account needed)
 
 Skip the env var:

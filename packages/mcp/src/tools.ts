@@ -54,6 +54,8 @@ export const eventsListSchema = {
 
 export const eventInspectSchema = {
   id: z.string().describe("Event ID returned by anyhook_events."),
+  api_key: z.string().optional()
+    .describe("API key (ahk_live_...) from anyhook_quickstart. Only needed over HTTP when no Authorization header is set; ignored over stdio."),
 };
 
 export const providersSchema = {};
@@ -66,7 +68,17 @@ export const eventsSimulateSchema = {
 };
 
 // Remote-mode schemas
+
+// Over streamable HTTP the transport is stateless, so a keyless session can't
+// keep the key quickstart minted. Account tools accept it per call instead;
+// the HTTP route consumes this argument and strips it before dispatch.
+export const apiKeyParam = {
+  api_key: z.string().optional()
+    .describe("API key (ahk_live_...) from anyhook_quickstart. Only needed over HTTP when no Authorization header is set; ignored over stdio."),
+};
+
 export const eventsListUnifiedSchema = {
+  ...apiKeyParam,
   appSlug: z.string().optional().describe("Filter to a specific app slug (account mode)."),
   source: z.string().optional().describe("Filter by provider source (local mode)."),
   status: z.string().optional()
@@ -81,10 +93,11 @@ export const eventsListRemoteSchema = {
 };
 
 export const eventReplaySchema = {
+  ...apiKeyParam,
   id: z.string().describe("Event ID to replay. Replay does not consume event quota."),
 };
 
-export const appsListSchema = {};
+export const appsListSchema = { ...apiKeyParam };
 
 export const quickstartSchema = {
   destination_url: z.string().url().optional()
@@ -94,6 +107,7 @@ export const quickstartSchema = {
 };
 
 export const appsCreateSchema = {
+  ...apiKeyParam,
   name: z.string().describe("Human-readable app name."),
   source: z
     .string()
@@ -105,11 +119,13 @@ export const appsCreateSchema = {
 };
 
 export const appUndeliveredSchema = {
+  ...apiKeyParam,
   appSlug: z.string(),
   limit: z.number().int().min(1).max(200).optional(),
 };
 
 export const appReplayFailedSchema = {
+  ...apiKeyParam,
   appSlug: z.string().describe("Bulk-replay every failed event for this app."),
 };
 

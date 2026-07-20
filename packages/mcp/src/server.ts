@@ -65,7 +65,7 @@ function noKeyError() {
       type: "text" as const,
       text: JSON.stringify({
         error: "No API key connected.",
-        fix: "Run anyhook_quickstart first (free, no signup — creates an endpoint + key instantly), or set ANYHOOK_API_KEY in your MCP config.",
+        fix: "Run anyhook_quickstart first (free, no signup — creates an endpoint + key instantly). Over stdio, set ANYHOOK_API_KEY in your MCP config; over HTTP, send an Authorization: Bearer header or pass the key as the api_key argument on any account tool.",
       }),
     }],
     isError: true,
@@ -76,7 +76,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   const config = opts.config ?? loadConfig();
   const store = opts.store ?? createMemoryStore({ maxEvents: 1000 });
   let client: AnyHookClient | null =
-    opts.client ?? (config.mode === "remote" ? new AnyHookClient(config) : null);
+    opts.client ?? (config.mode === "remote" && config.apiKey ? new AnyHookClient(config) : null);
 
   const server = new McpServer(
     { name: "anyhook", version: "0.2.0" },
@@ -232,7 +232,13 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         "(via ANYHOOK_API_KEY or anyhook_quickstart), otherwise the local in-memory store.",
       inputSchema: eventsListUnifiedSchema,
     },
-    async (input: Record<string, unknown>) => (client ? handleEventsListRemote(input, client) : handleEventsList(input, store))
+    async (input: Record<string, unknown>) => {
+      if (client) return handleEventsListRemote(input, client);
+      // remote-without-key (HTTP keyless session): a fresh memory store per
+      // request would silently return [] — steer the agent to a key instead
+      if (config.mode === "remote") return noKeyError();
+      return handleEventsList(input, store);
+    }
   );
 
   server.registerTool(
@@ -243,7 +249,11 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         "Full detail for one event: source, type, status, delivery summary. Account or local store.",
       inputSchema: eventInspectSchema,
     },
-    async (input) => (client ? handleEventInspectRemote(input, client) : handleEventInspect(input, store))
+    async (input) => {
+      if (client) return handleEventInspectRemote(input, client);
+      if (config.mode === "remote") return noKeyError();
+      return handleEventInspect(input, store);
+    }
   );
 
   if (config.mode === "local") {
