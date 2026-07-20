@@ -15,6 +15,7 @@ import { verifySignature } from "@anyhook/core/signature";
 import type { EventStore, NewEventInput } from "@anyhook/core/store";
 import type { AnyHookClient } from "./client";
 import { AnyHookApiError } from "./client";
+import { USER_AGENT } from "./config";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Input schemas (Zod)
@@ -418,7 +419,7 @@ export async function handleQuickstart(
   try {
     const res = await fetch(`${apiBase}/api/v1/quickstart`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "User-Agent": USER_AGENT },
       body: JSON.stringify(input ?? {}),
     });
     const body = (await res.json()) as Record<string, unknown>;

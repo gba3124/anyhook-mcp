@@ -7,6 +7,7 @@
  * them as MCP errors uniformly.
  */
 import type { McpConfig } from "./config";
+import { USER_AGENT } from "./config";
 
 export class AnyHookApiError extends Error {
   constructor(
@@ -54,6 +55,7 @@ export class AnyHookClient {
   ): Promise<T> {
     const url = `${this.cfg.apiBase}${path}`;
     const headers: Record<string, string> = {
+      "User-Agent": USER_AGENT,
       Authorization: `Bearer ${this.cfg.apiKey}`,
       Accept: "application/json",
       ...(init.headers as Record<string, string> | undefined),

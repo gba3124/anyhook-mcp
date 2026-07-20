@@ -20,6 +20,10 @@ export type McpConfig = {
 
 const DEFAULT_API_BASE = "https://anyhook.net";
 
+/** Sent on every outbound request from this package — never a bare library
+ *  default (some edges, e.g. Cloudflare Bot Fight Mode, 403 known-bot UAs). */
+export const USER_AGENT = "anyhook-mcp/0.2.1";
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
   const apiKey = env.ANYHOOK_API_KEY?.trim() || undefined;
   const apiBase = (env.ANYHOOK_API_BASE?.trim() || DEFAULT_API_BASE).replace(/\/$/, "");
