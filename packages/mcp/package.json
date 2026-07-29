@@ -28,7 +28,7 @@
     "openai",
     "langchain"
   ],
-  "mcpName": "io.github.gba3124/mcp",
+  "mcpName": "net.anyhook/anyhook",
   "bin": {
     "anyhook-mcp": "./dist/cli.js"
   },

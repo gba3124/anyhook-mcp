@@ -1,7 +1,8 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-  "name": "io.github.gba3124/mcp",
-  "description": "Webhook relay for AI agents: keyless quickstart, event inspection, replay, mock payloads.",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "net.anyhook/anyhook",
+  "title": "AnyHook",
+  "description": "A webhook inbox for agents: one call returns a live URL. Mock, verify, inspect and replay.",
   "version": "0.2.2",
   "websiteUrl": "https://anyhook.net",
   "repository": {
@@ -9,32 +10,6 @@
     "source": "github",
     "subfolder": "packages/mcp"
   },
-  "packages": [
-    {
-      "registryType": "npm",
-      "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "anyhook-mcp",
-      "version": "0.2.2",
-      "runtimeHint": "npx",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "ANYHOOK_API_KEY",
-          "description": "Personal API key from anyhook.net/dashboard/settings/api-keys. Starts with ahk_live_. Optional: without it, the anyhook_quickstart tool can self-provision an account, or tools run against an in-memory store for local dev.",
-          "isRequired": false,
-          "isSecret": true
-        },
-        {
-          "name": "ANYHOOK_API_BASE",
-          "description": "Override the API base URL. Defaults to https://anyhook.net. Used by self-hosted AnyHook installations.",
-          "isRequired": false,
-          "isSecret": false
-        }
-      ]
-    }
-  ],
   "remotes": [
     {
       "type": "streamable-http",
