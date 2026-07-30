@@ -4,5 +4,11 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": ">=2.0.10",
+      "esbuild": ">=0.28.1"
+    }
   }
 }
