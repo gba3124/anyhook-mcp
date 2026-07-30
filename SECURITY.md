@@ -21,8 +21,7 @@ Send to <security@anyhook.net> with `[SECURITY]` in the subject.
 - The packages in this repository: `@anyhook/core`, `anyhook-mcp`,
   `anyhook-verify` (Apache 2.0)
 - Issues in the hosted service (`anyhook.net`, `in.anyhook.net`) are also
-  welcome through the same channels — see the full policy timelines in the
-  [main project's security policy](https://github.com/gba3124/anyhook/security/policy)
+  welcome through the same channels
 
 ## What to expect
 
