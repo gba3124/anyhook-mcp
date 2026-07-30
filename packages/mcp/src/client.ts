@@ -38,6 +38,8 @@ export type RemoteApp = {
   name: string;
   source: string;
   inboundUrl: string;
+  /** The same app by email — {user-slug}.{app-slug}@anyhook.net. */
+  inboxAddress?: string;
   destinations?: { url: string; signing_secret?: string }[];
   createdAt?: string;
 };

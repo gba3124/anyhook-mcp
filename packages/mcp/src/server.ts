@@ -33,6 +33,7 @@ import {
   handleEventInspectRemote,
   handleEventReplay,
   handleAppsList,
+  handleInbox,
   handleAppsCreate,
   handleAppUndelivered,
   handleAppReplayFailed,
@@ -45,6 +46,7 @@ import {
   eventsListRemoteSchema,
   eventReplaySchema,
   appsListSchema,
+  inboxSchema,
   appsCreateSchema,
   appUndeliveredSchema,
   appReplayFailedSchema,
@@ -160,6 +162,23 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       async () => {
         if (!client) return noKeyError();
         return handleAppsList(undefined, client);
+      }
+    );
+
+    server.registerTool(
+      "anyhook_inbox",
+      {
+        title: "Get this app's email inbox address",
+        description:
+          "Every AnyHook app is also an email inbox: mail sent to {user}.{app}@anyhook.net " +
+          "becomes an event (type email.received) you can read with anyhook_events. " +
+          "Returns the address and webhook URL for one of your apps. " +
+          "No account yet? anyhook_quickstart returns an inbox_address directly.",
+        inputSchema: inboxSchema,
+      },
+      async (input: { app?: string }) => {
+        if (!client) return noKeyError();
+        return handleInbox(input ?? {}, client);
       }
     );
 

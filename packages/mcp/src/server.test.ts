@@ -34,6 +34,7 @@ describe("MCP server integration", () => {
       "anyhook_apps_create",
       "anyhook_apps_list",
       "anyhook_events",
+      "anyhook_inbox",
       "anyhook_inspect",
       "anyhook_mock",
       "anyhook_providers",

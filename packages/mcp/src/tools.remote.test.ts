@@ -10,6 +10,7 @@ import {
   handleEventInspectRemote,
   handleEventReplay,
   handleAppsList,
+  handleInbox,
   handleAppsCreate,
   handleAppUndelivered,
   handleAppReplayFailed,
@@ -89,6 +90,45 @@ describe("handleEventReplay", () => {
     const data = parse(result);
     expect(data.replayed).toBe(true);
     expect(data.id).toBe("evt_123");
+  });
+});
+
+describe("handleInbox", () => {
+  const apps = [
+    { slug: "quickstart", inboxAddress: "u1.quickstart@anyhook.net", inboundUrl: "https://in.anyhook.net/u1/quickstart" },
+    { slug: "stripe-prod", inboxAddress: "u1.stripe-prod@anyhook.net", inboundUrl: "https://in.anyhook.net/u1/stripe-prod" },
+  ];
+
+  it("defaults to the first app", async () => {
+    const client = fakeClient({ listApps: vi.fn().mockResolvedValue({ apps }) });
+    const data = parse(await handleInbox({}, client));
+    expect(data.inbox_address).toBe("u1.quickstart@anyhook.net");
+    expect(data.inbound_url).toBe("https://in.anyhook.net/u1/quickstart");
+  });
+
+  it("selects by slug", async () => {
+    const client = fakeClient({ listApps: vi.fn().mockResolvedValue({ apps }) });
+    const data = parse(await handleInbox({ app: "stripe-prod" }, client));
+    expect(data.inbox_address).toBe("u1.stripe-prod@anyhook.net");
+  });
+
+  it("unknown slug → error listing what exists", async () => {
+    const client = fakeClient({ listApps: vi.fn().mockResolvedValue({ apps }) });
+    const data = parse(await handleInbox({ app: "nope" }, client));
+    expect(data.error).toContain("nope");
+    expect(data.available).toEqual(["quickstart", "stripe-prod"]);
+  });
+
+  it("no apps → points at quickstart", async () => {
+    const client = fakeClient({ listApps: vi.fn().mockResolvedValue({ apps: [] }) });
+    const data = parse(await handleInbox({}, client));
+    expect(data.fix).toContain("anyhook_quickstart");
+  });
+
+  it("server without inbox support → says so instead of inventing an address", async () => {
+    const client = fakeClient({ listApps: vi.fn().mockResolvedValue({ apps: [{ slug: "old" }] }) });
+    const data = parse(await handleInbox({}, client));
+    expect(data.error).toContain("does not expose inbox addresses");
   });
 });
 

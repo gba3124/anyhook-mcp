@@ -100,6 +100,12 @@ export const eventReplaySchema = {
 
 export const appsListSchema = { ...apiKeyParam };
 
+export const inboxSchema = {
+  ...apiKeyParam,
+  app: z.string().optional()
+    .describe("App slug (from anyhook_apps_list). Defaults to your first app."),
+};
+
 export const quickstartSchema = {
   destination_url: z.string().url().optional()
     .describe("Optional forwarding destination for the new endpoint."),
@@ -356,6 +362,45 @@ export async function handleEventReplay(
   try {
     const result = await client.replayEvent(input.id);
     return asTextContent({ replayed: true, id: input.id, response: result });
+  } catch (err) {
+    return asApiError(err);
+  }
+}
+
+export async function handleInbox(input: { app?: string }, client: AnyHookClient) {
+  try {
+    const { apps } = await client.listApps();
+    if (!apps.length) {
+      return asTextContent({
+        error: "No apps in this account.",
+        fix: "Run anyhook_quickstart to create one — it returns an inbox_address directly.",
+      });
+    }
+
+    const app = input.app ? apps.find((a) => a.slug === input.app) : apps[0];
+    if (!app) {
+      return asTextContent({
+        error: `No app with slug '${input.app}'.`,
+        available: apps.map((a) => a.slug),
+      });
+    }
+    // Older API deploys don't return addresses; surface that rather than fabricating
+    // one here — the address format is owned by the server, not this client.
+    if (!app.inboxAddress) {
+      return asTextContent({
+        error: "This AnyHook server does not expose inbox addresses (self-hosted or outdated).",
+        app: app.slug,
+      });
+    }
+
+    return asTextContent({
+      app: app.slug,
+      inbox_address: app.inboxAddress,
+      inbound_url: app.inboundUrl,
+      note:
+        "Any email sent to inbox_address becomes an event on this app (type email.received, " +
+        "with from/to/subject and the full raw message). Read it with anyhook_events / anyhook_inspect.",
+    });
   } catch (err) {
     return asApiError(err);
   }
