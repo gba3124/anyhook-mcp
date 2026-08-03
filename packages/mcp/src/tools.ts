@@ -47,12 +47,6 @@ export const verifySchema = {
     .describe("Original request URL (required for Twilio/HubSpot). Defaults to a placeholder."),
 };
 
-export const eventsListSchema = {
-  status: z.enum(["received", "forwarded", "failed", "retrying"]).optional(),
-  source: z.string().optional(),
-  limit: z.number().int().min(1).max(500).optional(),
-};
-
 export const eventInspectSchema = {
   id: z.string().describe("Event ID returned by anyhook_events."),
   api_key: z.string().optional()
@@ -84,12 +78,6 @@ export const eventsListUnifiedSchema = {
   source: z.string().optional().describe("Filter by provider source (local mode)."),
   status: z.string().optional()
     .describe("Filter by status. Account mode: queued|success|retrying|failed. Local mode: received|forwarded|failed|retrying."),
-  limit: z.number().int().min(1).max(200).optional(),
-};
-
-export const eventsListRemoteSchema = {
-  appSlug: z.string().optional().describe("Filter to a specific app slug."),
-  status: z.enum(["queued", "success", "retrying", "failed"]).optional(),
   limit: z.number().int().min(1).max(200).optional(),
 };
 
