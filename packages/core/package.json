@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "AnyHook core \u2014 signature verification, mock generation, event store, forwarder.",
+  "description": "AnyHook core, signature verification, mock generation, event store, forwarder.",
   "license": "Apache-2.0",
   "exports": {
     ".": "./src/index.ts",
@@ -16,10 +16,10 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "vitest": "^4.1.4",
-    "typescript": "^5.0.0",
-    "stripe": "^22.0.0",
-    "svix": "^1.90.0"
+    "stripe": "^22.4.0",
+    "svix": "^1.99.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "repository": {
     "type": "git",

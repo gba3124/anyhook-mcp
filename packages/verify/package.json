@@ -2,7 +2,7 @@
   "name": "anyhook-verify",
   "version": "0.1.0",
   "type": "module",
-  "description": "Verify Anyhook-Signature webhook deliveries \u2014 Web Crypto, zero runtime deps, works in Node / Bun / Deno / Cloudflare Workers / Vercel Edge.",
+  "description": "Verify Anyhook-Signature webhook deliveries, Web Crypto, zero runtime deps, works in Node / Bun / Deno / Cloudflare Workers / Vercel Edge.",
   "license": "Apache-2.0",
   "author": "Owen Cheng",
   "homepage": "https://anyhook.net",
@@ -57,9 +57,9 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.43",
     "tsup": "^8.5.1",
-    "typescript": "^5.0.0",
-    "vitest": "^4.1.4"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }

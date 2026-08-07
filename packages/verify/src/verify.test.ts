@@ -33,7 +33,7 @@ describe("parseSignatureHeader", () => {
   });
 
   it("tolerates whitespace around separators", () => {
-    const r = parseSignatureHeader("  t=1716567890 , v1=abc123 ");
+    const r = parseSignatureHeader("  t=1716567890, v1=abc123 ");
     expect(r).toEqual({ timestamp: 1716567890, signatures: ["abc123"] });
   });
 
@@ -67,7 +67,7 @@ describe("verifyWebhook round-trip", () => {
     await expect(verifyWebhook(req, SECRET)).resolves.toBe(true);
   });
 
-  it("does not consume the body — caller can still read it", async () => {
+  it("does not consume the body, caller can still read it", async () => {
     const body = '{"hello":"world"}';
     const ts = Math.floor(Date.now() / 1000);
     const header = await signWebhook({ secret: SECRET, timestamp: ts, payload: body });
@@ -78,7 +78,7 @@ describe("verifyWebhook round-trip", () => {
     expect(await req.text()).toBe(body);
   });
 
-  it("accepts any header casing — Headers.get() is case-insensitive", async () => {
+  it("accepts any header casing, Headers.get() is case-insensitive", async () => {
     const body = "ping";
     const ts = Math.floor(Date.now() / 1000);
     const header = await signWebhook({ secret: SECRET, timestamp: ts, payload: body });
@@ -160,12 +160,12 @@ describe("verifyWebhook key rotation", () => {
     const header = `t=${ts},v1=${oldSig},v1=${newSig}`;
 
     const req = reqWith({ "Anyhook-Signature": header }, body);
-    // Caller is on new secret — should still verify because one of the
+    // Caller is on new secret, should still verify because one of the
     // v1 entries matches.
     await expect(verifyWebhook(req, newSecret)).resolves.toBe(true);
-    // Caller still on old secret — should also verify.
+    // Caller still on old secret, should also verify.
     await expect(verifyWebhook(req, oldSecret)).resolves.toBe(true);
-    // Caller on a totally unrelated secret — rejects.
+    // Caller on a totally unrelated secret, rejects.
     await expect(verifyWebhook(req, "whsec_unrelated_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
       .resolves.toBe(false);
   });

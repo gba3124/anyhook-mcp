@@ -1,5 +1,5 @@
 /**
- * Mock module — generates webhook requests with valid signatures.
+ * Mock module, generates webhook requests with valid signatures.
  *
  * Each mock is verified against the signature module to prove correctness:
  * the same code that verifies real provider webhooks must accept our fakes.
@@ -10,7 +10,7 @@ import { verifySignature } from "../signature";
 
 const url = "https://example.com/webhook";
 
-describe("mock — Stripe", () => {
+describe("mock, Stripe", () => {
   it("generates a payment_intent.succeeded request that passes verifySignature", async () => {
     const secret = "whsec_test_123";
     const req = await mock({ provider: "stripe", event: "payment_intent.succeeded", secret });
@@ -26,7 +26,7 @@ describe("mock — Stripe", () => {
   it("default secret yields a verifiable request (no secret passed)", async () => {
     const req = await mock({ provider: "stripe", event: "payment_intent.succeeded" });
     const headers = new Headers(req.headers);
-    // The default secret is exposed via getFixture or similar — test uses the same default
+    // The default secret is exposed via getFixture or similar, test uses the same default
     // We just confirm the request is internally consistent: a default secret must be inferable.
     // Strategy: re-mock with the same provider+event and assert determinism of headers (minus timestamp).
     const req2 = await mock({ provider: "stripe", event: "payment_intent.succeeded" });
@@ -52,7 +52,7 @@ describe("mock — Stripe", () => {
   });
 });
 
-describe("mock — GitHub", () => {
+describe("mock, GitHub", () => {
   it("generates a pull_request.opened request that passes verifySignature", async () => {
     const secret = "github_webhook_secret";
     const req = await mock({ provider: "github", event: "pull_request.opened", secret });
@@ -71,7 +71,7 @@ describe("mock — GitHub", () => {
   });
 });
 
-describe("mock — Slack", () => {
+describe("mock, Slack", () => {
   it("generates an event_callback request that passes verifySignature", async () => {
     const secret = "slack_signing_secret";
     const req = await mock({ provider: "slack", event: "app_mention", secret });
@@ -84,7 +84,7 @@ describe("mock — Slack", () => {
   });
 });
 
-describe("mock — discovery", () => {
+describe("mock, discovery", () => {
   it("listProviders returns the providers that have fixtures", () => {
     const providers = listProviders();
     expect(providers).toContain("stripe");

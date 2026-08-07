@@ -1,5 +1,5 @@
 /**
- * Integration test — wires the real MCP server up to an in-process Client
+ * Integration test, wires the real MCP server up to an in-process Client
  * via InMemoryTransport, then exercises tools through the protocol.
  *
  * This is what verifies the whole MCP wiring (schema registration, request

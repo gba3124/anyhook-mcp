@@ -1,12 +1,12 @@
 /**
- * AnyHook MCP server — wires tool handlers into the MCP protocol.
+ * AnyHook MCP server, wires tool handlers into the MCP protocol.
  *
  * Two modes, picked from config (driven by env vars at boot):
  *
- *   - local mode (no ANYHOOK_API_KEY) — provider toolkit + memory event store.
+ *   - local mode (no ANYHOOK_API_KEY): provider toolkit + memory event store.
  *     Useful for trying the server out, mocking webhooks for a local handler,
  *     and exercising the events flow without an account.
- *   - remote mode (ANYHOOK_API_KEY set) — provider toolkit PLUS live tools
+ *   - remote mode (ANYHOOK_API_KEY set): provider toolkit PLUS live tools
  *     that query the user's real AnyHook account: list apps, create apps,
  *     list events, inspect, replay, list undelivered, bulk-replay-failed.
  *
@@ -65,7 +65,7 @@ function noKeyError() {
       type: "text" as const,
       text: JSON.stringify({
         error: "No API key connected.",
-        fix: "Run anyhook_quickstart first (free, no signup — creates an endpoint + key instantly). Over stdio, set ANYHOOK_API_KEY in your MCP config; over HTTP, send an Authorization: Bearer header or pass the key as the api_key argument on any account tool.",
+        fix: "Run anyhook_quickstart first (free, no signup, creates an endpoint + key instantly). Over stdio, set ANYHOOK_API_KEY in your MCP config; over HTTP, send an Authorization: Bearer header or pass the key as the api_key argument on any account tool.",
       }),
     }],
     isError: true,
@@ -146,7 +146,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     }
   );
 
-  // ── Account tools — always registered; guarded until a key exists ────────
+  // ── Account tools, always registered; guarded until a key exists ────────
   {
     // Remote mode: tools query the user's live AnyHook account
     server.registerTool(
@@ -201,7 +201,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       {
         title: "Replay an event",
         description:
-          "Re-send a stored event to its destinations. Replay does NOT consume monthly event quota — safe to call repeatedly while debugging.",
+          "Re-send a stored event to its destinations. Replay does NOT consume monthly event quota, safe to call repeatedly while debugging.",
         inputSchema: eventReplaySchema,
       },
       async (input) => {
@@ -239,7 +239,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     );
   }
 
-  // ── Events & inspect — single registration, mode-aware dispatch ──────────
+  // ── Events & inspect, single registration, mode-aware dispatch ──────────
   server.registerTool(
     "anyhook_events",
     {
@@ -252,7 +252,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     async (input: Record<string, unknown>) => {
       if (client) return handleEventsListRemote(input, client);
       // remote-without-key (HTTP keyless session): a fresh memory store per
-      // request would silently return [] — steer the agent to a key instead
+      // request would silently return []: steer the agent to a key instead
       if (config.mode === "remote") return noKeyError();
       return handleEventsList(input, store);
     }
@@ -283,7 +283,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         title: "Simulate an incoming webhook (local only)",
         description:
           "Generate a mocked webhook AND insert it into the local memory store, so list/inspect flows can be exercised without a real provider. " +
-          "Not available in remote mode — use anyhook_mock + your real inbound URL there.",
+          "Not available in remote mode, use anyhook_mock + your real inbound URL there.",
         inputSchema: eventsSimulateSchema,
       },
       async (input) => handleEventsSimulate(input, store)

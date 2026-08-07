@@ -1,13 +1,13 @@
 /**
- * Tool handlers — pure functions that take typed input and a backing
+ * Tool handlers, pure functions that take typed input and a backing
  * source (in-memory store OR live API client), return MCP-shaped responses.
  *
  * Tools fall into three groups:
- *   - Provider-only (mock / verify / providers) — work without any backend
- *   - Store-backed (events / inspect / simulate) — work against memory store in
+ *   - Provider-only (mock / verify / providers): work without any backend
+ *   - Store-backed (events / inspect / simulate): work against memory store in
  *     local mode; the same names re-register against the live API in remote mode
  *   - Remote-only (apps:list / apps:create / event:replay / undelivered /
- *     replay-failed) — require ANYHOOK_API_KEY
+ *     replay-failed): require ANYHOOK_API_KEY
  */
 import { z } from "zod";
 import { mock, listProviders, listEvents } from "@anyhook/core/mock";
@@ -130,7 +130,7 @@ export const appReplayFailedSchema = {
 
 // Shared MCP tool-call result shape so handlers and tests can both rely on
 // `isError` being part of the static type (some branches set it, success
-// branches omit it — without this declaration TypeScript narrows it away).
+// branches omit it, without this declaration TypeScript narrows it away).
 export type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
@@ -264,7 +264,7 @@ export async function handleProviders() {
 }
 
 /**
- * Simulate a webhook event hitting the local store — used in dev mode to
+ * Simulate a webhook event hitting the local store, used in dev mode to
  * exercise the inspect/list/replay flow without a real provider.
  */
 export async function handleEventsSimulate(
@@ -303,7 +303,7 @@ export async function handleEventsSimulate(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Remote-mode handlers — talk to the live AnyHook API via AnyHookClient.
+// Remote-mode handlers, talk to the live AnyHook API via AnyHookClient.
 // Surfaced only when ANYHOOK_API_KEY is set.
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -361,7 +361,7 @@ export async function handleInbox(input: { app?: string }, client: AnyHookClient
     if (!apps.length) {
       return asTextContent({
         error: "No apps in this account.",
-        fix: "Run anyhook_quickstart to create one — it returns an inbox_address directly.",
+        fix: "Run anyhook_quickstart to create one, it returns an inbox_address directly.",
       });
     }
 
@@ -373,7 +373,7 @@ export async function handleInbox(input: { app?: string }, client: AnyHookClient
       });
     }
     // Older API deploys don't return addresses; surface that rather than fabricating
-    // one here — the address format is owned by the server, not this client.
+    // one here, the address format is owned by the server, not this client.
     if (!app.inboxAddress) {
       return asTextContent({
         error: "This AnyHook server does not expose inbox addresses (self-hosted or outdated).",
@@ -462,7 +462,7 @@ export async function handleQuickstart(
     return asTextContent({
       ...body,
       mcp_note:
-        "This MCP session is now connected to the new account — remote tools " +
+        "This MCP session is now connected to the new account, remote tools " +
         "(anyhook_events, anyhook_apps_create, ...) work immediately. To persist " +
         "across sessions, set ANYHOOK_API_KEY to the api_key above in your MCP " +
         "config. Open claim_url in a browser to keep the endpoint permanently.",

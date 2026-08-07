@@ -1,5 +1,5 @@
 /**
- * Smoke tests for remote-mode tool handlers — exercise the contract
+ * Smoke tests for remote-mode tool handlers, exercise the contract
  * between the handler shape and a mocked AnyHookClient. We don't hit the
  * network here; we only assert that handlers extract args correctly,
  * dispatch to the right client method, and surface errors as MCP errors.

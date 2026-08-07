@@ -5,7 +5,7 @@
  *
  *   Anyhook-Signature: t=<unix_seconds>,v1=<hex>[,v1=<hex>...]
  *
- * Multiple `v1=` entries support graceful key rotation — the destination
+ * Multiple `v1=` entries support graceful key rotation, the destination
  * signs with the new secret AND the previous secret during the rotation
  * window so existing handlers don't need to redeploy at the same instant.
  *
@@ -15,7 +15,7 @@
  * Bun, Deno, Cloudflare Workers, and Vercel Edge without ifdefs.
  */
 
-const DEFAULT_TOLERANCE_SECONDS = 300; // 5 minutes — matches Stripe convention
+const DEFAULT_TOLERANCE_SECONDS = 300; // 5 minutes, matches Stripe convention
 
 export type VerifyOptions = {
   /**
@@ -25,7 +25,7 @@ export type VerifyOptions = {
    */
   tolerance?: number;
   /**
-   * Override the wall clock, in UNIX **seconds** (not milliseconds) — useful for
+   * Override the wall clock, in UNIX **seconds** (not milliseconds): useful for
    * tests and for handlers that deliberately operate in a different time domain.
    * Default: `Math.floor(Date.now() / 1000)`.
    */
@@ -37,7 +37,7 @@ export type ParsedSignatureHeader = {
   signatures: string[];
 };
 
-/** Result returned by the throwing API on success — the throwing variants
+/** Result returned by the throwing API on success, the throwing variants
  * also expose the verified raw body and timestamp so the caller doesn't
  * have to read the body twice. */
 export type VerifiedWebhook = {
@@ -61,7 +61,7 @@ const REASON_MESSAGES: Record<VerifyFailureReason, string> = {
   "malformed-header":
     "Anyhook-Signature header is present but could not be parsed (expected `t=<unix_seconds>,v1=<hex>`).",
   "timestamp-outside-tolerance":
-    "Anyhook-Signature timestamp is outside the allowed tolerance window — possible replay attempt or significant clock skew.",
+    "Anyhook-Signature timestamp is outside the allowed tolerance window, possible replay attempt or significant clock skew.",
   "signature-mismatch":
     "Anyhook-Signature did not match the HMAC of the request body with the supplied secret.",
   "body-already-consumed":
@@ -82,7 +82,7 @@ export class WebhookVerificationError extends Error {
 
 /**
  * Parse a raw `Anyhook-Signature` header value into its parts.
- * Returns `null` if the value is malformed — never throws.
+ * Returns `null` if the value is malformed, never throws.
  */
 export function parseSignatureHeader(
   value: string | null | undefined
@@ -118,7 +118,7 @@ export function parseSignatureHeader(
  * The original `req` is therefore still readable afterwards. **But**: if
  * the caller already consumed `req.body` (e.g. ran `await req.json()`
  * before calling this), the underlying ReadableStream is locked and
- * `clone()` would throw — in that case verifyWebhook returns `false` and
+ * `clone()` would throw, in that case verifyWebhook returns `false` and
  * `verifyWebhookOrThrow` throws `WebhookVerificationError` with
  * `reason === "body-already-consumed"`. If your framework eats the body
  * for you, use {@link verifyPayload} with the raw body string instead.
@@ -153,7 +153,7 @@ export async function verifyWebhook(
  * body twice. Throws {@link WebhookVerificationError} on any failure,
  * with a typed `reason` field for branching.
  *
- * Use this style if you prefer Stripe-SDK-flavoured loud failure — it's
+ * Use this style if you prefer Stripe-SDK-flavoured loud failure, it's
  * harder to accidentally skip a check (an unhandled rejection will fail
  * the request) than to forget an `if (!ok) return` after the boolean
  * variant.
@@ -194,7 +194,7 @@ export async function verifyPayload(input: {
 }
 
 /**
- * Throwing variant of {@link verifyPayload} — see {@link verifyWebhookOrThrow}
+ * Throwing variant of {@link verifyPayload}: see {@link verifyWebhookOrThrow}
  * for the contract.
  */
 export async function verifyPayloadOrThrow(input: {
@@ -212,7 +212,7 @@ export async function verifyPayloadOrThrow(input: {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Internal — single source of truth for the verification state machine.
+// Internal, single source of truth for the verification state machine.
 // ──────────────────────────────────────────────────────────────────────────
 
 type InternalResult =
@@ -251,7 +251,7 @@ async function verifyPayloadInner(input: {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Primitives — Web Crypto + byte-level constant-time equality.
+// Primitives, Web Crypto + byte-level constant-time equality.
 // Exported under anyhook-verify/testing for test fixture generation
 // (see ./testing.ts) but kept internal here to discourage casual import.
 // ──────────────────────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ function bytesToHex(bytes: Uint8Array): string {
 
 /**
  * Constant-time string equality. Same shape as the helper in
- * `@anyhook/core` — see that file for why we don't use Node's
+ * `@anyhook/core`, see that file for why we don't use Node's
  * `crypto.timingSafeEqual` here (cross-runtime: Edge runtimes have
  * Web Crypto only, not the Node `crypto` module).
  */

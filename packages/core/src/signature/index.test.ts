@@ -1,5 +1,5 @@
 /**
- * Signature module — comprehensive test suite.
+ * Signature module, comprehensive test suite.
  * Covers all 19 provider verifiers, source detection, and PayPal helpers.
  */
 import { describe, expect, it } from "vitest";
@@ -53,14 +53,25 @@ async function hmacBase64(
 // Source Detection
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("detectSource — all 14 providers + generic", () => {
+describe("detectSource, all 14 providers + generic", () => {
   it("detects Stripe via stripe-signature header", () => {
     expect(detectSource(new Headers({ "stripe-signature": "t=123,v1=abc" }))).toBe("stripe");
   });
 
-  it("detects GitHub via x-hub-signature-256 header", () => {
-    expect(detectSource(new Headers({ "x-hub-signature-256": "sha256=abc" }))).toBe("github");
+  it("detects GitHub via x-hub-signature-256 with x-github-event", () => {
+    // Every real GitHub delivery carries X-GitHub-Event. Meta signs with the same
+    // X-Hub-Signature-256 and never sends it, so that header is what tells them apart.
+    expect(detectSource(new Headers({
+      "x-hub-signature-256": "sha256=abc",
+      "x-github-event": "push",
+    }))).toBe("github");
   });
+
+  it("detects Meta via x-hub-signature-256 with no x-github-event", () => {
+    // Instagram, Facebook and Threads all sign this way.
+    expect(detectSource(new Headers({ "x-hub-signature-256": "sha256=abc" }))).toBe("meta");
+  });
+
 
   it("detects Shopify via x-shopify-hmac-sha256 header", () => {
     expect(detectSource(new Headers({ "x-shopify-hmac-sha256": "abc" }))).toBe("shopify");
@@ -121,6 +132,7 @@ describe("detectSource — all 14 providers + generic", () => {
   it("prefers GitHub over Intercom when both x-hub-signature and x-hub-signature-256 present", () => {
     expect(
       detectSource(new Headers({
+        "x-github-event": "push",
         "x-hub-signature-256": "sha256=abc",
         "x-hub-signature": "sha1=abc",
       }))
@@ -133,10 +145,10 @@ describe("detectSource — all 14 providers + generic", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Signature Verification — Happy Path
+// Signature Verification, Happy Path
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("verifySignature — all providers", () => {
+describe("verifySignature, all providers", () => {
   const body = JSON.stringify({ test: true });
   const secret = "test_webhook_secret";
   const url = "https://in.anyhook.net/demo/app";
@@ -354,7 +366,7 @@ describe("verifySignature — all providers", () => {
 // Missing Header Edge Cases
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("verifySignature — missing header returns false", () => {
+describe("verifySignature, missing header returns false", () => {
   const body = '{"test":true}';
   const secret = "test_secret";
   const url = "https://in.anyhook.net/demo/app";
@@ -417,10 +429,10 @@ describe("verifySignature — missing header returns false", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Clerk / Resend — same Svix UA, always 'svix' on auto-detect
+// Clerk / Resend, same Svix UA, always 'svix' on auto-detect
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("detectSource — Clerk/Resend indistinguishable from Svix on auto-detect", () => {
+describe("detectSource, Clerk/Resend indistinguishable from Svix on auto-detect", () => {
   it("svix-signature always returns svix (Clerk/Resend use identical Svix UA)", () => {
     expect(detectSource(new Headers({
       "svix-signature": "v1,abc",
@@ -439,7 +451,7 @@ describe("detectSource — Clerk/Resend indistinguishable from Svix on auto-dete
 // HubSpot v3 + v2 + v1 fallback
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("verifySignature — HubSpot v3 + v2 fallback", () => {
+describe("verifySignature, HubSpot v3 + v2 fallback", () => {
   const body = JSON.stringify({ test: true });
   const secret = "hubspot_secret";
   const url = "https://in.anyhook.net/demo/app";
@@ -499,7 +511,7 @@ describe("verifySignature — HubSpot v3 + v2 fallback", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PayPal helpers — CRC32 + SPKI extraction
+// PayPal helpers, CRC32 + SPKI extraction
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("CRC32", () => {
@@ -583,7 +595,7 @@ describe("extractSpkiFromCert", () => {
   });
 });
 
-describe("verifySignature — PayPal", () => {
+describe("verifySignature, PayPal", () => {
   const body = JSON.stringify({ event_type: "PAYMENT.CAPTURE.COMPLETED" });
   const webhookId = "WH-test-12345";
   const url = "https://in.anyhook.net/demo/app";

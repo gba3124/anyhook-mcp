@@ -14,6 +14,9 @@
 export type Provider =
   | "stripe"
   | "github"
+  // Instagram, Facebook and Threads all share Meta's Graph API webhook contract:
+  // the same X-Hub-Signature-256 HMAC and the same hub.challenge subscribe handshake.
+  | "meta"
   | "shopify"
   | "lemonsqueezy"
   | "paddle"
@@ -39,7 +42,14 @@ export type Provider =
 
 export function detectSource(headers: Headers): string {
   if (headers.get("stripe-signature")) return "stripe";
-  if (headers.get("x-hub-signature-256")) return "github";
+  // GitHub and Meta (Instagram, Facebook, Threads) both sign with X-Hub-Signature-256,
+  // because both descend from the same PubSubHubbub convention. The HMAC is identical,
+  // so verification works either way, but the label is what the event log shows and
+  // what any per-source handling keys off. GitHub always sends X-Github-Event; Meta
+  // never does, so that header is the split.
+  if (headers.get("x-hub-signature-256")) {
+    return headers.get("x-github-event") ? "github" : "meta";
+  }
   if (headers.get("x-signature") && headers.get("x-event-name")) return "lemonsqueezy";
   if (headers.get("paddle-signature")) return "paddle";
   if (headers.get("sentry-hook-signature")) return "sentry";
@@ -49,7 +59,7 @@ export function detectSource(headers: Headers): string {
   if (headers.get("x-wc-webhook-signature")) return "woocommerce";
   if (headers.get("paypal-transmission-sig")) return "paypal";
   // Clerk and Resend both use Svix infra with identical headers (UA = "Svix-Webhooks/x.y.z").
-  // Auto-detect cannot distinguish them — all return 'svix'. Users should explicitly set source to 'clerk' or 'resend'.
+  // Auto-detect cannot distinguish them, all return 'svix'. Users should explicitly set source to 'clerk' or 'resend'.
   if (headers.get("svix-signature") || headers.get("webhook-signature")) return "svix";
   if (headers.get("x-slack-signature")) return "slack";
   if (headers.get("x-twilio-signature")) return "twilio";
@@ -66,16 +76,16 @@ export function detectSource(headers: Headers): string {
 
 /**
  * Constant-time string equality. We can't use Node's `crypto.timingSafeEqual`
- * because this module runs in Cloudflare Workers (Edge) as well as Node — the
+ * because this module runs in Cloudflare Workers (Edge) as well as Node, the
  * Edge runtime exposes Web Crypto but not the Node crypto module.
  *
  * Implementation: convert both strings to UTF-8 bytes and XOR-accumulate.
  * Byte-level comparison is closer to what Node's `timingSafeEqual` does
  * internally and gives V8's JIT less room to optimise into a short-circuit
- * (the length check itself is acceptable to leak — signature hash lengths
+ * (the length check itself is acceptable to leak, signature hash lengths
  * are fixed by algorithm and public).
  */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();
   const aBytes = enc.encode(a);
   const bBytes = enc.encode(b);
@@ -577,7 +587,7 @@ async function verifyWooCommerce(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// PayPal — RSA-SHA256 with cert fetch + SPKI extraction
+// PayPal, RSA-SHA256 with cert fetch + SPKI extraction
 // ──────────────────────────────────────────────────────────────────────────────
 
 // CRC32 lookup table (IEEE 802.3 polynomial)
@@ -646,7 +656,7 @@ function pemToBytes(pem: string): Uint8Array {
 
 /**
  * Extract SubjectPublicKeyInfo (SPKI) from a DER-encoded X.509 certificate.
- * Minimal ASN.1 parser — only traverses the structure needed to reach SPKI.
+ * Minimal ASN.1 parser, only traverses the structure needed to reach SPKI.
  */
 export function extractSpkiFromCert(der: Uint8Array): ArrayBuffer | null {
   let offset = 0;
@@ -763,7 +773,10 @@ export async function verifySignature(
       const sig = headers.get("stripe-signature");
       return sig ? verifyStripe(body, sig, secret) : false;
     }
-    case "github": {
+    case "github":
+    // Meta signs exactly as GitHub does: sha256= followed by the HMAC of the raw body,
+    // keyed by the app secret. Same routine, different label.
+    case "meta": {
       const sig = headers.get("x-hub-signature-256");
       return sig ? verifyGithub(body, sig, secret) : false;
     }
@@ -814,7 +827,7 @@ export async function verifySignature(
     case "paypal":
       return verifyPayPal(body, headers, secret);
     case "generic":
-      return true; // generic provider has no signature scheme — nothing to verify
+      return true; // generic provider has no signature scheme, nothing to verify
     default:
       // Unknown/misspelled/mis-cased provider. Fail closed: reporting an unverified
       // payload as authentic (the old `return true`) is a signature-bypass hole.

@@ -1,5 +1,5 @@
 /**
- * Mock module — generate webhook requests with valid signatures.
+ * Mock module, generate webhook requests with valid signatures.
  *
  * Today supports Stripe, GitHub, and Slack. Adding a provider is two files:
  * a fixture map and a signer. The same code path that verifies real webhooks

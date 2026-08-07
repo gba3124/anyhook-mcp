@@ -1,5 +1,5 @@
 /**
- * In-memory event store — used by CLI (default) and MCP for ephemeral inspection.
+ * In-memory event store, used by CLI (default) and MCP for ephemeral inspection.
  */
 import { describe, expect, it } from "vitest";
 import { createMemoryStore } from "./index";
@@ -19,7 +19,7 @@ function sampleEvent(overrides: Partial<NewEventInput> = {}): NewEventInput {
   };
 }
 
-describe("memory store — insert + get", () => {
+describe("memory store, insert + get", () => {
   it("inserts an event and retrieves it by id", async () => {
     const store = createMemoryStore();
     const inserted = await store.insert(sampleEvent());
@@ -41,7 +41,7 @@ describe("memory store — insert + get", () => {
   });
 });
 
-describe("memory store — list", () => {
+describe("memory store, list", () => {
   it("returns events in reverse chronological order (newest first)", async () => {
     const store = createMemoryStore();
     const e1 = await store.insert(sampleEvent({ eventType: "first" }));
@@ -85,7 +85,7 @@ describe("memory store — list", () => {
   });
 });
 
-describe("memory store — status and delivery mutations", () => {
+describe("memory store, status and delivery mutations", () => {
   it("setStatus updates the status", async () => {
     const store = createMemoryStore();
     const e = await store.insert(sampleEvent());
@@ -133,7 +133,7 @@ describe("memory store — status and delivery mutations", () => {
   });
 });
 
-describe("memory store — clear", () => {
+describe("memory store, clear", () => {
   it("clear() removes all events and returns count", async () => {
     const store = createMemoryStore();
     await store.insert(sampleEvent());
@@ -147,7 +147,7 @@ describe("memory store — clear", () => {
   });
 });
 
-describe("memory store — maxEvents cap", () => {
+describe("memory store, maxEvents cap", () => {
   it("evicts oldest events when over the cap", async () => {
     const store = createMemoryStore({ maxEvents: 3 });
     const e1 = await store.insert(sampleEvent({ eventType: "first" }));
@@ -164,7 +164,7 @@ describe("memory store — maxEvents cap", () => {
   });
 });
 
-describe("memory store — tail", () => {
+describe("memory store, tail", () => {
   it("tail emits events inserted after the iterator starts", async () => {
     const store = createMemoryStore();
     const received: string[] = [];

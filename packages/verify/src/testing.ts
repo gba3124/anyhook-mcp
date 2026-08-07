@@ -1,5 +1,5 @@
 /**
- * Test fixture helpers — generate a valid Anyhook-Signature header for
+ * Test fixture helpers, generate a valid Anyhook-Signature header for
  * a given secret + body + timestamp. Use in your own integration tests
  * so you don't have to copy 20 lines of Web Crypto.
  *
@@ -11,7 +11,7 @@
  * This is kept in a separate sub-export so it doesn't pollute the
  * production bundle of every webhook handler with code that exists
  * only to forge test deliveries. Importing it in your production code
- * is a smell — that's why it's not in the main entry.
+ * is a smell, that's why it's not in the main entry.
  */
 import { hmacSha256Hex } from "./verify";
 

@@ -14,7 +14,7 @@ async function main() {
   const banner =
     config.mode === "remote"
       ? `[anyhook-mcp] connected (remote mode, api=${config.apiBase})`
-      : `[anyhook-mcp] connected (local mode — set ANYHOOK_API_KEY to query your account)`;
+      : `[anyhook-mcp] connected (local mode, set ANYHOOK_API_KEY to query your account)`;
   console.error(banner);
 }
 

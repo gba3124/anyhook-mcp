@@ -1,6 +1,6 @@
 # anyhook-verify
 
-Verify `Anyhook-Signature` webhook deliveries. Zero runtime deps. Same import in Node, Bun, Deno, Cloudflare Workers, and Vercel Edge — everything goes through Web Crypto.
+Verify `Anyhook-Signature` webhook deliveries. Zero runtime deps. Same import in Node, Bun, Deno, Cloudflare Workers, and Vercel Edge, everything goes through Web Crypto.
 
 Apache 2.0 · `npm i anyhook-verify`
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 }
 ```
 
-That's it. The signing secret is the per-destination value AnyHook gives you in the dashboard — copy it into your app's environment as `ANYHOOK_SIGNING_SECRET` (or any name you like).
+That's it. The signing secret is the per-destination value AnyHook gives you in the dashboard, copy it into your app's environment as `ANYHOOK_SIGNING_SECRET` (or any name you like).
 
 ---
 
@@ -31,10 +31,10 @@ Every call to `verifyWebhook` rejects unless **all** of these pass:
 
 1. The request has an `Anyhook-Signature` header (case-insensitive match)
 2. The header parses cleanly: `t=<unix_seconds>,v1=<hex>[,v1=<hex>...]`
-3. The timestamp is within the tolerance window (default ±5 minutes) — protects against indefinite replay
+3. The timestamp is within the tolerance window (default ±5 minutes): protects against indefinite replay
 4. At least one `v1` matches `HMAC-SHA256(secret, "${timestamp}.${rawBody}")`
 
-The body is read via `req.clone().text()` — your handler can still call `req.json()` afterwards. But if you've already consumed the body before calling `verifyWebhook`, `req.clone()` would throw — `verifyWebhook` detects this and returns `false` (the throwing variant returns `reason: "body-already-consumed"`). In that case use `verifyPayload` with the raw body string instead.
+The body is read via `req.clone().text()`, your handler can still call `req.json()` afterwards. But if you've already consumed the body before calling `verifyWebhook`, `req.clone()` would throw, `verifyWebhook` detects this and returns `false` (the throwing variant returns `reason: "body-already-consumed"`). In that case use `verifyPayload` with the raw body string instead.
 
 ---
 
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 }
 ```
 
-`WebhookVerificationError.reason` is a fixed string union — branch on it for logging or metrics without parsing the message text.
+`WebhookVerificationError.reason` is a fixed string union, branch on it for logging or metrics without parsing the message text.
 
 ---
 
@@ -109,9 +109,9 @@ app.post("/webhooks/anyhook", async (c) => {
 export default app;
 ```
 
-### Express (raw body — most common gotcha)
+### Express (raw body, most common gotcha)
 
-Express's default JSON middleware **consumes the body** before your handler sees it, which breaks signature verification because the re-serialised JSON has different whitespace from what was signed. Two options — pick one:
+Express's default JSON middleware **consumes the body** before your handler sees it, which breaks signature verification because the re-serialised JSON has different whitespace from what was signed. Two options, pick one:
 
 **A. Use `express.raw()` on the webhook route only**, and pass the raw string to `verifyPayload`:
 
@@ -139,7 +139,7 @@ app.post(
 );
 ```
 
-**B. Mount JSON middleware with a `verify` callback** to keep the raw bytes around. This is more involved — usually option A is simpler.
+**B. Mount JSON middleware with a `verify` callback** to keep the raw bytes around. This is more involved, usually option A is simpler.
 
 ---
 
@@ -154,7 +154,7 @@ app.post(
 | `options.tolerance` | `number` | Replay window in seconds. Default `300` (5 min) |
 | `options.now` | `number` | Override wall clock (UNIX seconds). For tests |
 
-Returns `true` only if every check passes. Never throws on malformed input — returns `false`.
+Returns `true` only if every check passes. Never throws on malformed input, returns `false`.
 
 ### `verifyWebhookOrThrow(req, secret, options?): Promise<VerifiedWebhook>`
 
@@ -170,15 +170,15 @@ Throwing variant of `verifyPayload`.
 
 ### `parseSignatureHeader(value): { timestamp, signatures } | null`
 
-Exposed for advanced use cases — logging, multi-tenant routing, custom verification flows. Returns `null` for any malformed input — never throws.
+Exposed for advanced use cases, logging, multi-tenant routing, custom verification flows. Returns `null` for any malformed input, never throws.
 
 ### `class WebhookVerificationError extends Error`
 
-Thrown by the `*OrThrow` variants. Carries a typed `reason` field — see [Loud-failure variant](#loud-failure-variant-stripe-style) above for the full enum.
+Thrown by the `*OrThrow` variants. Carries a typed `reason` field, see [Loud-failure variant](#loud-failure-variant-stripe-style) above for the full enum.
 
 ---
 
-## Test fixtures — `anyhook-verify/testing`
+## Test fixtures, `anyhook-verify/testing`
 
 For your own integration tests, import the signing helper from the dedicated sub-export:
 
@@ -202,7 +202,7 @@ it("processes a stripe.payment_intent.succeeded event", async () => {
 });
 ```
 
-`signWebhook` is intentionally not in the main export — using it in production code is a smell (it forges deliveries with whatever secret you give it).
+`signWebhook` is intentionally not in the main export, using it in production code is a smell (it forges deliveries with whatever secret you give it).
 
 ---
 
@@ -214,9 +214,9 @@ Verifying a webhook signature is ~20 lines of code. You could write it yourself.
 - **Constant-time comparison**: the loop is written to give the JIT less opportunity to short-circuit
 - **Replay window enforced by default**: easy to forget when hand-rolling
 - **Key rotation**: multiple `v1=` segments are checked, supporting overlap during a rotation
-- **No dependencies**: nothing to audit, nothing to update — Web Crypto only
+- **No dependencies**: nothing to audit, nothing to update, Web Crypto only
 
-If you'd rather inline, the algorithm is described in [`src/verify.ts`](./src/verify.ts) — the wire format is Stripe-compatible (`t=<unix_seconds>,v1=<hex>`).
+If you'd rather inline, the algorithm is described in [`src/verify.ts`](./src/verify.ts): the wire format is Stripe-compatible (`t=<unix_seconds>,v1=<hex>`).
 
 ---
 
@@ -226,16 +226,16 @@ If you'd rather inline, the algorithm is described in [`src/verify.ts`](./src/ve
 Anyhook-Signature: t=1716567890,v1=a3f2…b7e8
 ```
 
-- `t` — UNIX seconds when the forwarder signed the delivery. Re-signed fresh on every retry, so replays-of-old-attempts always fail the tolerance window.
-- `v1=` — hex HMAC-SHA256 of `"${timestamp}.${rawBody}"` using the destination's signing secret. Multiple `v1=` entries (during key rotation) are tried in order; any match passes.
+- `t`, UNIX seconds when the forwarder signed the delivery. Re-signed fresh on every retry, so replays-of-old-attempts always fail the tolerance window.
+- `v1=`, hex HMAC-SHA256 of `"${timestamp}.${rawBody}"` using the destination's signing secret. Multiple `v1=` entries (during key rotation) are tried in order; any match passes.
 
 ---
 
 ## Security notes
 
-- **The raw body matters.** If your framework re-serialises JSON before you pass it to `verifyPayload`, key order / whitespace differences will break the signature. Always use the raw string the network gave you. `verifyWebhook` handles this automatically by reading from the `Request` directly — but only if you haven't already consumed the body.
+- **The raw body matters.** If your framework re-serialises JSON before you pass it to `verifyPayload`, key order / whitespace differences will break the signature. Always use the raw string the network gave you. `verifyWebhook` handles this automatically by reading from the `Request` directly, but only if you haven't already consumed the body.
 - **Don't log the secret.** It's the only shared knowledge between AnyHook and your handler; treat it like a Stripe webhook signing secret. Rotate via the dashboard if you suspect leakage.
-- **Tolerance should stay tight.** The default 5 minutes covers reasonable clock skew. Going to hours largely defeats the point — at that range, a leaked Anyhook-Signature header (e.g. in a captured network log) replays indefinitely.
+- **Tolerance should stay tight.** The default 5 minutes covers reasonable clock skew. Going to hours largely defeats the point, at that range, a leaked Anyhook-Signature header (e.g. in a captured network log) replays indefinitely.
 
 ---
 

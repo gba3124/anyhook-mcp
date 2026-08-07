@@ -1,5 +1,5 @@
 /**
- * anyhook-verify — verify Anyhook-Signature webhook deliveries.
+ * anyhook-verify, verify Anyhook-Signature webhook deliveries.
  *
  * Quick start:
  *
@@ -30,8 +30,7 @@
  *
  *   import { signWebhook } from "anyhook-verify/testing";
  *
- * Runs in Node 20+, Bun, Deno, Cloudflare Workers, and Vercel Edge —
- * no runtime ifdefs needed.
+ * Runs in Node 20+, Bun, Deno, Cloudflare Workers, and Vercel Edge, * no runtime ifdefs needed.
  */
 export {
   verifyWebhook,

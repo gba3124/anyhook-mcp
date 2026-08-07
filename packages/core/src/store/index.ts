@@ -1,5 +1,5 @@
 /**
- * Event store — abstraction over where webhook events are persisted.
+ * Event store, abstraction over where webhook events are persisted.
  *
  * The in-memory implementation is the default for the CLI (ephemeral) and
  * MCP server (per-session). SQLite + cloud stores plug in later behind the

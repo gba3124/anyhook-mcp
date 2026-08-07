@@ -1,8 +1,8 @@
 /**
- * Public library surface — re-exports for embedding the MCP server
+ * Public library surface, re-exports for embedding the MCP server
  * inside another runtime (instead of running it via the CLI / stdio).
  *
- * Not used by Claude Desktop / Cursor / Claude Code — those go through
+ * Not used by Claude Desktop / Cursor / Claude Code, those go through
  * the bin entry point (`anyhook-mcp`) which spawns the stdio transport.
  */
 export { createAnyHookMcpServer } from "./server";

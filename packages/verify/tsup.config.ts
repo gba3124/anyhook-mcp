@@ -1,6 +1,6 @@
 import { defineConfig } from "tsup";
 
-// Bundle for npm — two ESM entries (main + /testing), types co-located,
+// Bundle for npm, two ESM entries (main + /testing), types co-located,
 // no Node-specific imports so the package keeps working on Edge runtimes.
 export default defineConfig({
   entry: {

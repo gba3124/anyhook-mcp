@@ -1,6 +1,6 @@
 # anyhook-mcp
 
-An MCP server that gives AI agents eyes on webhooks — inspect events, replay deliveries, mock signed payloads, create apps. Designed for the `45-second AI handler` workflow.
+An MCP server that gives AI agents eyes on webhooks, inspect events, replay deliveries, mock signed payloads, create apps. Designed for the `45-second AI handler` workflow.
 
 Apache 2.0 · `npm i -g anyhook-mcp`
 
@@ -14,7 +14,7 @@ No API key needed to start:
 claude mcp add anyhook -- npx -y anyhook-mcp
 ```
 
-Then ask your agent to run **`anyhook_quickstart`** — it creates a free relay
+Then ask your agent to run **`anyhook_quickstart`**, it creates a free relay
 endpoint + API key instantly (no signup), and this MCP session auto-connects.
 All account tools (events, replay, apps) work immediately. The response includes
 a `claim_url` to keep the endpoint permanently.
@@ -23,22 +23,22 @@ a `claim_url` to keep the endpoint permanently.
 
 Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent can:
 
-- `anyhook_apps_list` — see every app in your AnyHook account with its inbound URL
-- `anyhook_apps_create` — spin up a new app from a prompt
-- `anyhook_events` — list recent events, filter by app / status
-- `anyhook_inspect` — pull a single event's headers, body, signature status
-- `anyhook_replay` — re-send a stored event to its destinations (does not burn quota)
-- `anyhook_undelivered` — list events that never reached a destination
-- `anyhook_replay_failed` — bulk-replay every failed event for an app
-- `anyhook_mock` — generate a signed Stripe / GitHub / Slack payload for local handler testing
-- `anyhook_verify` — verify any incoming signature against your secret
-- `anyhook_providers` — list every webhook provider AnyHook supports
+- `anyhook_apps_list`, see every app in your AnyHook account with its inbound URL
+- `anyhook_apps_create`, spin up a new app from a prompt
+- `anyhook_events`, list recent events, filter by app / status
+- `anyhook_inspect`, pull a single event's headers, body, signature status
+- `anyhook_replay`, re-send a stored event to its destinations (does not burn quota)
+- `anyhook_undelivered`, list events that never reached a destination
+- `anyhook_replay_failed`, bulk-replay every failed event for an app
+- `anyhook_mock`, generate a signed Stripe / GitHub / Slack payload for local handler testing
+- `anyhook_verify`, verify any incoming signature against your secret
+- `anyhook_providers`, list every webhook provider AnyHook supports
 
 Two modes:
 
 | Mode | When | What works |
 |---|---|---|
-| **remote** | `ANYHOOK_API_KEY` is set | All tools above — live against your AnyHook account |
+| **remote** | `ANYHOOK_API_KEY` is set | All tools above, live against your AnyHook account |
 | **local** | No API key | Provider toolkit (`mock` / `verify` / `providers`) + an in-memory store you can simulate events into. Useful for trying it out before signing up. |
 
 ---
@@ -111,14 +111,14 @@ Or edit `~/.claude/mcp.json` directly with the same structure as above.
 
 The same server is hosted at `https://anyhook.net/mcp` (streamable HTTP,
 stateless). Use it from claude.ai custom connectors, ChatGPT, or any client
-that speaks HTTP — nothing to install:
+that speaks HTTP, nothing to install:
 
 ```json
 { "mcpServers": { "anyhook": { "url": "https://anyhook.net/mcp" } } }
 ```
 
 Auth per request: send `Authorization: Bearer ahk_live_...`, or connect
-keyless and call `anyhook_quickstart` — it returns an `api_key` you then pass
+keyless and call `anyhook_quickstart`, it returns an `api_key` you then pass
 as an argument on account tool calls (the transport is stateless, so the
 session can't hold it for you).
 
@@ -175,14 +175,14 @@ Calls `anyhook_mock` with `targetUrl` set; returns the request that was sent + y
 
 | Var | Required | Default | Purpose |
 |---|---|---|---|
-| `ANYHOOK_API_KEY` | for remote mode | — | `ahk_live_*` from <https://www.anyhook.net/dashboard/settings/api-keys> |
+| `ANYHOOK_API_KEY` | for remote mode | - | `ahk_live_*` from <https://www.anyhook.net/dashboard/settings/api-keys> |
 | `ANYHOOK_API_BASE` | no | `https://www.anyhook.net` | Override for self-hosted AnyHook deployments |
 
 ---
 
 ## Why this is interesting
 
-AI agents have been blind to their own webhook infrastructure. They can write the integration code, but once an event misbehaves in production they can't see it — you tell them what happened. With this MCP server, Claude / Cursor can read the actual event log, replay deliveries, debug signature failures, and even spin up new apps. It closes the loop between writing webhook code and operating it.
+AI agents have been blind to their own webhook infrastructure. They can write the integration code, but once an event misbehaves in production they can't see it, you tell them what happened. With this MCP server, Claude / Cursor can read the actual event log, replay deliveries, debug signature failures, and even spin up new apps. It closes the loop between writing webhook code and operating it.
 
 ---
 
