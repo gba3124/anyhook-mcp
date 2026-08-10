@@ -154,7 +154,9 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       {
         title: "List your AnyHook apps",
         description:
-          "List apps in your AnyHook account with inbound URLs, sources, and destination URLs.",
+          "List apps in your AnyHook account with inbound URLs, sources, and destination URLs. " +
+          "Check isActive: an inactive app's inbound URL answers setup handshakes but acknowledges " +
+          "and discards event POSTs (202, reason app_inactive) instead of relaying them.",
         inputSchema: appsListSchema,
       },
       async () => {
@@ -185,7 +187,10 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       {
         title: "Create a new AnyHook app",
         description:
-          "Create a new app with a name, provider source, and (optionally) destinations. Returns the inbound URL.",
+          "Create a new app with a name, provider source, and (optionally) destinations. Returns the inbound URL. " +
+          "Created WITHOUT destinations, the app starts inactive: its inbound URL answers provider handshakes " +
+          "(Meta hub.challenge etc.) but acknowledges and discards event POSTs (202, reason app_inactive) until " +
+          "a destination is added and is_active is set true (PATCH /api/v1/apps/{slug}).",
         inputSchema: appsCreateSchema,
       },
       async (input) => {

@@ -34,6 +34,11 @@ Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent c
 - `anyhook_verify`, verify any incoming signature against your secret
 - `anyhook_providers`, list every webhook provider AnyHook supports
 
+The inbound URL an app gives you accepts webhook POSTs and also answers provider
+setup handshakes automatically: Meta's `GET` carrying `hub.mode=subscribe` gets its
+`hub.challenge` echoed back, even before the app is configured, so the URL can be
+registered in the Meta App Dashboard first and wired up after.
+
 Two modes:
 
 | Mode | When | What works |
@@ -51,7 +56,7 @@ npm install -g anyhook-mcp
 npx -y anyhook-mcp
 ```
 
-Get an API key from <https://www.anyhook.net/dashboard/settings/api-keys>. Keys start with `ahk_live_`.
+Get an API key from <https://anyhook.net/dashboard/settings/api-keys>. Keys start with `ahk_live_`.
 
 ---
 
@@ -175,8 +180,8 @@ Calls `anyhook_mock` with `targetUrl` set; returns the request that was sent + y
 
 | Var | Required | Default | Purpose |
 |---|---|---|---|
-| `ANYHOOK_API_KEY` | for remote mode | - | `ahk_live_*` from <https://www.anyhook.net/dashboard/settings/api-keys> |
-| `ANYHOOK_API_BASE` | no | `https://www.anyhook.net` | Override for self-hosted AnyHook deployments |
+| `ANYHOOK_API_KEY` | for remote mode | - | `ahk_live_*` from <https://anyhook.net/dashboard/settings/api-keys> |
+| `ANYHOOK_API_BASE` | no | `https://anyhook.net` | Override for self-hosted AnyHook deployments |
 
 ---
 
