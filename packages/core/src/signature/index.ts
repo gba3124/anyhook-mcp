@@ -1,5 +1,5 @@
 /**
- * Signature verification for 19 webhook providers.
+ * Signature verification for 20 webhook providers.
  *
  * All verifiers use Web Crypto API (crypto.subtle) so they run unchanged in
  * Node 20+, Cloudflare Workers, Bun, and Deno.
@@ -26,6 +26,7 @@ export type Provider =
   | "clerk"
   | "resend"
   | "slack"
+  | "line"
   | "twilio"
   | "intercom"
   | "linear"
@@ -62,6 +63,7 @@ export function detectSource(headers: Headers): string {
   // Auto-detect cannot distinguish them, all return 'svix'. Users should explicitly set source to 'clerk' or 'resend'.
   if (headers.get("svix-signature") || headers.get("webhook-signature")) return "svix";
   if (headers.get("x-slack-signature")) return "slack";
+  if (headers.get("x-line-signature")) return "line";
   if (headers.get("x-twilio-signature")) return "twilio";
   if (headers.get("x-signature-ed25519")) return "discord";
   if (headers.get("x-hub-signature") && !headers.get("x-hub-signature-256")) return "intercom";
@@ -782,6 +784,12 @@ export async function verifySignature(
     }
     case "shopify": {
       const sig = headers.get("x-shopify-hmac-sha256");
+      return sig ? verifyShopify(body, sig, secret) : false;
+    }
+    case "line": {
+      // LINE's scheme is Shopify's exactly: base64(HMAC-SHA256(channel secret, raw body)).
+      // The secret is the Messaging API channel secret.
+      const sig = headers.get("x-line-signature");
       return sig ? verifyShopify(body, sig, secret) : false;
     }
     case "lemonsqueezy": {

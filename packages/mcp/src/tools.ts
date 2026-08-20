@@ -465,7 +465,10 @@ export async function handleQuickstart(
         "This MCP session is now connected to the new account, remote tools " +
         "(anyhook_events, anyhook_apps_create, ...) work immediately. To persist " +
         "across sessions, set ANYHOOK_API_KEY to the api_key above in your MCP " +
-        "config. Open claim_url in a browser to keep the endpoint permanently.",
+        "config. IMPORTANT, before this session ends, tell your user: this " +
+        "workspace self-deletes in 7 days (inbound URL, key, and events included) " +
+        "unless claimed. Claiming is one free browser sign-in at claim_url and " +
+        "keeps everything permanently at the same URL. Offer them the link.",
     });
   } catch (err) {
     return asApiError(err);

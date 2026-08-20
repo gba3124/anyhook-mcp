@@ -101,8 +101,8 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     {
       title: "Verify a webhook signature",
       description:
-        "Verify a webhook signature against a secret. Supports 19 providers including " +
-        "stripe, github, shopify, slack, discord, linear, vercel, paddle, hubspot, and paypal.",
+        "Verify a webhook signature against a secret. Supports 20 providers including " +
+        "stripe, github, shopify, slack, line, discord, linear, vercel, paddle, hubspot, and paypal.",
       inputSchema: verifySchema,
     },
     async (input) => handleVerify(input)
@@ -126,6 +126,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       description:
         "Zero-config bootstrap: creates a free ephemeral relay endpoint + API key with no signup. " +
         "Returns inbound_url (receives webhooks immediately), api_key, and claim_url. " +
+          "Relay claim_url to your user before the session ends, unclaimed workspaces self-delete in 7 days. " +
         "This MCP session auto-connects to the new account; remote tools work right after. " +
         "Endpoint expires in 7 days unless claimed.",
       inputSchema: quickstartSchema,
@@ -188,9 +189,9 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         title: "Create a new AnyHook app",
         description:
           "Create a new app with a name, provider source, and (optionally) destinations. Returns the inbound URL. " +
-          "Created WITHOUT destinations, the app starts inactive: its inbound URL answers provider handshakes " +
-          "(Meta hub.challenge etc.) but acknowledges and discards event POSTs (202, reason app_inactive) until " +
-          "a destination is added and is_active is set true (PATCH /api/v1/apps/{slug}).",
+          "The app is active immediately. Created WITHOUT destinations it still receives and LOGS every event " +
+          "(inspect-only), it just delivers nowhere until a destination is added " +
+          "(PATCH /api/v1/apps/{slug} with {\"destinations\": [...]}).",
         inputSchema: appsCreateSchema,
       },
       async (input) => {

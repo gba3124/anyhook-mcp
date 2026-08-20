@@ -77,6 +77,10 @@ describe("detectSource, all 14 providers + generic", () => {
     expect(detectSource(new Headers({ "x-shopify-hmac-sha256": "abc" }))).toBe("shopify");
   });
 
+  it("detects LINE via x-line-signature header", () => {
+    expect(detectSource(new Headers({ "x-line-signature": "abc" }))).toBe("line");
+  });
+
   it("detects Discord via x-signature-ed25519 header", () => {
     expect(detectSource(new Headers({ "x-signature-ed25519": "abc" }))).toBe("discord");
   });
@@ -220,6 +224,18 @@ describe("verifySignature, all providers", () => {
     const sig = await hmacBase64(body, secret, "SHA-256");
     const headers = new Headers({ "x-shopify-hmac-sha256": sig });
     expect(await verifySignature("shopify", headers, body, secret, url)).toBe(true);
+  });
+
+  it("verifies LINE signature (base64 HMAC-SHA256 of raw body, channel secret)", async () => {
+    const sig = await hmacBase64(body, secret, "SHA-256");
+    const headers = new Headers({ "x-line-signature": sig });
+    expect(await verifySignature("line", headers, body, secret, url)).toBe(true);
+  });
+
+  it("rejects LINE signature over a tampered body", async () => {
+    const sig = await hmacBase64(body, secret, "SHA-256");
+    const headers = new Headers({ "x-line-signature": sig });
+    expect(await verifySignature("line", headers, body + "x", secret, url)).toBe(false);
   });
 
   it("verifies Stripe signature", async () => {
@@ -381,6 +397,10 @@ describe("verifySignature, missing header returns false", () => {
 
   it("Shopify without x-shopify-hmac-sha256 header → false", async () => {
     expect(await verifySignature("shopify", new Headers(), body, secret, url)).toBe(false);
+  });
+
+  it("LINE without x-line-signature header → false", async () => {
+    expect(await verifySignature("line", new Headers(), body, secret, url)).toBe(false);
   });
 
   it("Slack without x-slack-signature header → false", async () => {
