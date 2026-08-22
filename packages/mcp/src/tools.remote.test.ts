@@ -57,26 +57,39 @@ describe("handleEventsListRemote", () => {
 });
 
 describe("handleEventInspectRemote", () => {
-  it("returns the matching event from the list", async () => {
+  it("fetches the one event by id, with its payload", async () => {
     const client = fakeClient({
-      listEvents: vi.fn().mockResolvedValue({
-        events: [
-          { id: "a", source: "stripe" },
-          { id: "b", source: "github" },
-        ],
+      getEvent: vi.fn().mockResolvedValue({
+        event: { id: "b", source: "github", inboundBody: { action: "opened" } },
       }),
+      listEvents: vi.fn(),
     });
     const result = await handleEventInspectRemote({ id: "b" }, client);
-    expect(parse(result).source).toBe("github");
+    expect(client.getEvent).toHaveBeenCalledWith("b");
+    const event = parse(result);
+    expect(event.source).toBe("github");
+    expect(event.inboundBody.action).toBe("opened");
+    // The whole point of the detail endpoint: no scanning a listing to find one row.
+    expect(client.listEvents).not.toHaveBeenCalled();
   });
 
-  it("returns an error when the id is not in the latest 200 events", async () => {
+  it("turns a 404 into a pointer at anyhook_events rather than a raw API error", async () => {
     const client = fakeClient({
-      listEvents: vi.fn().mockResolvedValue({ events: [{ id: "x", source: "stripe" }] }),
+      getEvent: vi.fn().mockRejectedValue(new AnyHookApiError(404, "Event not found")),
     });
     const result = await handleEventInspectRemote({ id: "missing" }, client);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("missing");
+    expect(result.content[0].text).toContain("anyhook_events");
+  });
+
+  it("surfaces non-404 API errors as-is", async () => {
+    const client = fakeClient({
+      getEvent: vi.fn().mockRejectedValue(new AnyHookApiError(401, "Unauthorized")),
+    });
+    const result = await handleEventInspectRemote({ id: "b" }, client);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("401");
   });
 });
 

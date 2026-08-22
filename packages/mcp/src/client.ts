@@ -40,7 +40,21 @@ export type RemoteApp = {
   inboundUrl: string;
   /** The same app by email, {user-slug}.{app-slug}@anyhook.net. */
   inboxAddress?: string;
-  destinations?: { url: string; signing_secret?: string }[];
+  /** Former slugs: each still routes here, so a provider left on one loses nothing. */
+  previousSlugs?: string[];
+  /** Inbound URLs built from previousSlugs. */
+  legacyInboundUrls?: string[];
+  destinations?: {
+    url: string;
+    enabled?: boolean;
+    /**
+     * Signing secrets are shown once, when the app is created or the secret is
+     * rotated, and are redacted everywhere else. These two fields are what a
+     * listing returns; rotate to obtain a new secret in plaintext.
+     */
+    has_signing_secret?: boolean;
+    signing_secret_hint?: string;
+  }[];
   createdAt?: string;
 };
 
@@ -108,6 +122,14 @@ export class AnyHookClient {
     if (params.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.request(`/api/v1/events${suffix}`);
+  }
+
+  /**
+   * One event with its payload. Listings omit bodies, so this is how a body is
+   * read — previously inspect had to scan 200 listed events to find one.
+   */
+  async getEvent(id: string): Promise<{ event: RemoteEvent & Record<string, unknown> }> {
+    return this.request(`/api/v1/events/${encodeURIComponent(id)}`);
   }
 
   async replayEvent(id: string): Promise<unknown> {

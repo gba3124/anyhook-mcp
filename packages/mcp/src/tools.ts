@@ -330,15 +330,18 @@ export async function handleEventInspectRemote(
   input: { id: string },
   client: AnyHookClient
 ) {
-  // The list endpoint returns one event at a time when we filter precisely;
-  // there is no dedicated GET /events/{id} in the v1 API today. We surface
-  // a sharp message rather than silently returning nothing.
+  // GET /api/v1/events/{id}: one row, payload included. This used to pull the
+  // latest 200 events and discard 199, which both cost a fortune in tokens and
+  // could not see an event older than that window.
   try {
-    const { events } = await client.listEvents({ limit: 200 });
-    const found = events.find((e) => e.id === input.id);
-    if (!found) return asErrorContent(`No event with id '${input.id}' in the latest 200 events`);
-    return asTextContent(found);
+    const { event } = await client.getEvent(input.id);
+    return asTextContent(event);
   } catch (err) {
+    if (err instanceof Error && /\b404\b|not found/i.test(err.message)) {
+      return asErrorContent(
+        `No event with id '${input.id}'. Use anyhook_events to list recent event ids.`
+      );
+    }
     return asApiError(err);
   }
 }

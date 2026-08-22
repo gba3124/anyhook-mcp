@@ -119,7 +119,10 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     async () => handleProviders()
   );
 
-  server.registerTool(
+  // Only offered to sessions that have no account yet. With a key (or an OAuth
+  // token on the hosted endpoint) the user already has an account, and a
+  // quickstart would create a second, ephemeral one they can't see.
+  if (!config.apiKey) server.registerTool(
     "anyhook_quickstart",
     {
       title: "Create a free AnyHook endpoint (no account needed)",
@@ -157,7 +160,10 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         description:
           "List apps in your AnyHook account with inbound URLs, sources, and destination URLs. " +
           "Check isActive: an inactive app's inbound URL answers setup handshakes but acknowledges " +
-          "and discards event POSTs (202, reason app_inactive) instead of relaying them.",
+          "and discards event POSTs (202, reason app_inactive) instead of relaying them. " +
+          "Destination signing secrets are redacted to has_signing_secret plus a 4-char hint; " +
+          "a new secret in plaintext comes only from rotating it. An app whose slug was changed " +
+          "lists its former URLs under legacyInboundUrls; those still route to it.",
         inputSchema: appsListSchema,
       },
       async () => {
@@ -251,8 +257,10 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     {
       title: "List recent webhook events",
       description:
-        "List webhook events (most recent first). Uses your AnyHook account when connected " +
-        "(via ANYHOOK_API_KEY or anyhook_quickstart), otherwise the local in-memory store.",
+        "List webhook events, most recent first: id, app, type, status, attempt, destination " +
+        "status code, latency, timestamp. Summaries only, no request headers or body — call " +
+        "anyhook_inspect with an id from here to read one event's payload. Uses your AnyHook " +
+        "account when connected, otherwise the local in-memory store.",
       inputSchema: eventsListUnifiedSchema,
     },
     async (input: Record<string, unknown>) => {
@@ -269,7 +277,10 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     {
       title: "Inspect a specific event",
       description:
-        "Full detail for one event: source, type, status, delivery summary. Account or local store.",
+        "Full detail for one event by id, including the inbound headers and body that " +
+        "anyhook_events omits, plus the destination's response. Payloads can be large and " +
+        "often contain personal data, so fetch one at a time, only when the body is needed. " +
+        "Account or local store.",
       inputSchema: eventInspectSchema,
     },
     async (input) => {
