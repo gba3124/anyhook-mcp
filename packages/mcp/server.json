@@ -3,13 +3,39 @@
   "name": "net.anyhook/anyhook",
   "title": "AnyHook",
   "description": "A webhook inbox for agents: one call returns a live URL. Mock, verify, inspect and replay.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "websiteUrl": "https://anyhook.net",
   "repository": {
     "url": "https://github.com/gba3124/anyhook-mcp",
     "source": "github",
     "subfolder": "packages/mcp"
   },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "anyhook-mcp",
+      "version": "0.2.3",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ANYHOOK_API_KEY",
+          "description": "Personal API key from anyhook.net/dashboard/settings/api-keys. Starts with ahk_live_. Optional: without it, the anyhook_quickstart tool can self-provision an account, or tools run against an in-memory store for local dev.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "ANYHOOK_API_BASE",
+          "description": "Override the API base URL. Defaults to https://anyhook.net. Used by self-hosted AnyHook installations.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
   "remotes": [
     {
       "type": "streamable-http",

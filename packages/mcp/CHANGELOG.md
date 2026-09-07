@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.3]: 2026-08-26
+
+### Fixed
+
+- `mcpName` and `server.json` now say `net.anyhook/anyhook`, the DNS-verified namespace the official MCP Registry actually holds. The published 0.2.2 tarball still declared `io.github.gba3124/mcp`, an identifier that resolves to nothing, so every stdio install carried a dead name.
+- `server.json` declares `packages` again. It had been dropped when the manifest was rewritten for the newer schema, leaving only `remotes`. Because the npm ownership proof runs off `mcpName`, and `mcpName` still pointed at the old namespace, the registry had no way to accept the npm package at all: AnyHook appeared there as a remote-only server and `npx -y anyhook-mcp` was invisible to any client that installs over stdio.
+- Manifest moves to schema `2025-12-11`. The two environment variable descriptions come back with it.
+
 ## [0.2.2]: 2026-07-20
 
 ### Added
@@ -48,7 +56,7 @@ Two-mode MCP server selected by env at boot.
 ### Distribution
 
 - `bin: anyhook-mcp`, installable via `npx -y anyhook-mcp`, runs over stdio transport for Claude Desktop / Cursor / Claude Code.
-- `mcpName: io.github.gba3124/mcp`, namespace claim for the official MCP Registry.
+- `mcpName: io.github.gba3124/mcp`, namespace claim for the official MCP Registry. (Superseded in 0.2.3 by `net.anyhook/anyhook`; this identifier no longer resolves.)
 - `server.json` manifest (schema `2025-07-09`) ships in the npm tarball, declares `ANYHOOK_API_KEY` (secret) and `ANYHOOK_API_BASE` (overridable for self-hosted) for client-side configuration UI.
 
 ### Internal

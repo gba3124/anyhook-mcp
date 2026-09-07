@@ -1,6 +1,6 @@
 {
   "name": "anyhook-mcp",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "description": "AnyHook MCP server, gives AI agents eyes on webhooks (inspect, replay, mock, verify) for Stripe, GitHub, OpenAI, Anthropic, LangChain, and more.",
   "license": "Apache-2.0",
