@@ -1,0 +1,84 @@
+name: Stage anyhook-mcp on npm
+
+# Releases run from here, not from the private monorepo, because provenance
+# only works from a public source repository: npm refuses the attestation with
+# "Unsupported GitHub Actions source repository visibility: private".
+#
+# That refusal is correct rather than inconvenient. A provenance statement
+# pointing at a repository nobody can open attests to nothing. The code that
+# ships is mirrored here, package.json's repository field already points here,
+# and this is the tree a consumer can actually read.
+#
+# The trusted publisher on npmjs.com must therefore name gba3124/anyhook-mcp,
+# this file, and the npm-publish environment.
+
+on:
+  push:
+    tags:
+      - "mcp-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and sign without touching the registry"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # provenance and the OIDC handshake both need this
+
+jobs:
+  stage:
+    name: Build, test, and stage on npm
+    runs-on: ubuntu-latest
+    environment:
+      name: npm-publish
+      url: https://www.npmjs.com/package/anyhook-mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.28.2
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22 because the npm that supports trusted publishing no longer runs
+          # on 20: npm@latest is 12.x and wants node ^22.22.2.
+          node-version: "22"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      # The shipped npm is 10.x whatever the node line, and trusted publishing
+      # landed in 11.5.1. Without this npm never attempts OIDC, falls back to
+      # looking for a token, and fails with ENEEDAUTH after a clean build.
+      - name: npm new enough for trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm --filter anyhook-mcp test
+
+      - name: Build
+        run: pnpm --filter anyhook-mcp build
+
+      # No NODE_AUTH_TOKEN: this goes out over OIDC against the trusted
+      # publisher. Classic tokens were revoked, and a granular token in a
+      # secret is the thing OIDC exists to remove.
+      #
+      # Stage, not a direct release. The publisher grants stage only, on
+      # purpose: a version queued here is not installable until a human
+      # approves it on npmjs.com, so a compromised workflow reaches nobody.
+      # This job therefore SUCCEEDS without the version going live, and the
+      # release is not finished until someone presses the button.
+      - name: Stage (dry-run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        working-directory: packages/mcp
+        run: npm stage publish --dry-run --access public --provenance
+
+      - name: Stage on npm
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run) }}
+        working-directory: packages/mcp
+        run: npm stage publish --access public --provenance
