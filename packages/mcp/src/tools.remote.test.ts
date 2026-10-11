@@ -14,6 +14,7 @@ import {
   handleAppsCreate,
   handleAppUndelivered,
   handleAppReplayFailed,
+  handleConnect,
   type ToolResult,
 } from "./tools";
 import { AnyHookApiError, type AnyHookClient } from "./client";
@@ -188,5 +189,30 @@ describe("handleAppUndelivered + handleAppReplayFailed", () => {
     const result = await handleAppReplayFailed({ appSlug: "billing" }, client);
     expect(client.replayFailedForApp).toHaveBeenCalledWith("billing");
     expect(parse(result).appSlug).toBe("billing");
+  });
+});
+
+describe("handleConnect", () => {
+  const key = ["rk", "live", "k".repeat(24)].join("_");
+
+  it("sends the provider key as `key` with the app and target, and returns the result", async () => {
+    const client = fakeClient({
+      connect: vi.fn().mockResolvedValue({ connected: true, provider: "stripe", inboundUrl: "https://in.anyhook.net/acme/stripe" }),
+    });
+    const result = await handleConnect({ provider_key: key, appSlug: "payments" }, client);
+    expect(client.connect).toHaveBeenCalledWith({ key, app: "payments", target: undefined });
+    expect(parse(result)).toMatchObject({ connected: true, provider: "stripe" });
+  });
+
+  it("passes the route's error, detail and fix through so the agent can act on them", async () => {
+    const client = fakeClient({
+      connect: vi.fn().mockRejectedValue(
+        new AnyHookApiError(403, "missing_permission", { error: "missing_permission", detail: "The key cannot manage webhook endpoints.", fix: "Webhook Endpoints = Write" })
+      ),
+    });
+    const result = await handleConnect({ provider_key: key }, client);
+    expect(result.isError).toBe(true);
+    expect(parse(result)).toMatchObject({ status: 403, error: "missing_permission", fix: "Webhook Endpoints = Write" });
+    expect(result.content[0].text).not.toContain(key);
   });
 });

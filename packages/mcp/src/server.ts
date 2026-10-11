@@ -48,7 +48,31 @@ import {
   appsCreateSchema,
   appUndeliveredSchema,
   appReplayFailedSchema,
+  connectSchema,
+  handleConnect,
 } from "./tools";
+
+/**
+ * Every tool's annotations, in one table so the hosted endpoint can read them
+ * too: /mcp lets an OAuth token with only anyhook:read call the read-only
+ * tools and asks for anyhook:write before any other (MCP step-up).
+ */
+export const TOOL_ANNOTATIONS = {
+  anyhook_mock: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_verify: { readOnlyHint: true },
+  anyhook_providers: { readOnlyHint: true },
+  anyhook_quickstart: { readOnlyHint: false, destructiveHint: false },
+  anyhook_apps_list: { readOnlyHint: true },
+  anyhook_inbox: { readOnlyHint: true },
+  anyhook_apps_create: { readOnlyHint: false, destructiveHint: false },
+  anyhook_connect: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+  anyhook_replay: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_undelivered: { readOnlyHint: true },
+  anyhook_replay_failed: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_events: { readOnlyHint: true },
+  anyhook_inspect: { readOnlyHint: true },
+  anyhook_simulate: { readOnlyHint: false, destructiveHint: false },
+} as const;
 
 export type ServerOptions = {
   /** Override the loaded config (mainly for tests). */
@@ -87,7 +111,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   server.registerTool(
     "anyhook_mock",
     {
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      annotations: TOOL_ANNOTATIONS.anyhook_mock,
       title: "Mock a webhook",
       description:
         "Generate a webhook request with a valid signature for Stripe, GitHub, or Slack. " +
@@ -100,7 +124,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   server.registerTool(
     "anyhook_verify",
     {
-      annotations: { readOnlyHint: true },
+      annotations: TOOL_ANNOTATIONS.anyhook_verify,
       title: "Verify a webhook signature",
       description:
         "Verify a webhook signature against a secret. Supports 20 providers including " +
@@ -113,7 +137,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   server.registerTool(
     "anyhook_providers",
     {
-      annotations: { readOnlyHint: true },
+      annotations: TOOL_ANNOTATIONS.anyhook_providers,
       title: "List supported providers and event types",
       description:
         "List webhook providers AnyHook can mock, along with the event types available for each.",
@@ -128,7 +152,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   if (!config.apiKey) server.registerTool(
     "anyhook_quickstart",
     {
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: TOOL_ANNOTATIONS.anyhook_quickstart,
       title: "Create a free AnyHook endpoint (no account needed)",
       description:
         "Zero-config bootstrap: creates a free ephemeral relay endpoint + API key with no signup. " +
@@ -160,7 +184,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     server.registerTool(
       "anyhook_apps_list",
       {
-        annotations: { readOnlyHint: true },
+        annotations: TOOL_ANNOTATIONS.anyhook_apps_list,
         title: "List your AnyHook apps",
         description:
           "List apps in your AnyHook account with inbound URLs, sources, and destination URLs. " +
@@ -180,7 +204,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     server.registerTool(
       "anyhook_inbox",
       {
-        annotations: { readOnlyHint: true },
+        annotations: TOOL_ANNOTATIONS.anyhook_inbox,
         title: "Get this app's email inbox address",
         description:
           "Every AnyHook app is also an email inbox: mail sent to {user}.{app}@anyhook.net " +
@@ -197,7 +221,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     server.registerTool(
       "anyhook_apps_create",
       {
-        annotations: { readOnlyHint: false, destructiveHint: false },
+        annotations: TOOL_ANNOTATIONS.anyhook_apps_create,
         title: "Create a new AnyHook app",
         description:
           "Create a new app with a name, provider source, and (optionally) destinations. Returns the inbound URL. " +
@@ -212,15 +236,35 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       }
     );
 
+    server.registerTool(
+      "anyhook_connect",
+      {
+        annotations: TOOL_ANNOTATIONS.anyhook_connect,
+        title: "Connect Stripe or GitHub with one key",
+        description:
+          "Wire a provider to AnyHook in one call: give a Stripe or GitHub key and AnyHook registers the app's inbound URL " +
+          "as a webhook at the provider, saves the signing secret it yields, and turns on signature verification at the edge. " +
+          "The provider is read from the key; the key is used once and not stored. Without appSlug a new app is created " +
+          "(and removed again if the provider refuses the key). Re-running replaces the registration instead of duplicating it. " +
+          "GitHub sends a signed ping immediately, so the first event appears within seconds. Add a destination afterwards " +
+          "(PATCH /api/v1/apps/{slug}) to forward events; until then they are received and logged.",
+        inputSchema: connectSchema,
+      },
+      async (input) => {
+        if (!client) return noKeyError();
+        return handleConnect(input, client);
+      }
+    );
+
 
 
     server.registerTool(
       "anyhook_replay",
       {
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+        annotations: TOOL_ANNOTATIONS.anyhook_replay,
         title: "Replay an event",
         description:
-          "Re-send a stored event to its destinations. Replay does not consume monthly event quota, but the destination does run its handler again: a receiver that is not idempotent will process the event twice while debugging.",
+          "Re-send a stored event to its destinations. Replays sit outside the monthly event quota but within a daily replay limit per plan, and replaying an event that was held for quota bills it as a new event. The destination does run its handler again: a receiver that is not idempotent will process the event twice while debugging.",
         inputSchema: eventReplaySchema,
       },
       async (input) => {
@@ -232,7 +276,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     server.registerTool(
       "anyhook_undelivered",
       {
-        annotations: { readOnlyHint: true },
+        annotations: TOOL_ANNOTATIONS.anyhook_undelivered,
         title: "List undelivered events for an app",
         description:
           "Show events for the given app that have not successfully reached any destination (failed or still retrying).",
@@ -247,7 +291,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     server.registerTool(
       "anyhook_replay_failed",
       {
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+        annotations: TOOL_ANNOTATIONS.anyhook_replay_failed,
         title: "Bulk-replay all failed events for an app",
         description:
           "Re-send every failed event for the given app slug. Useful after fixing a downstream bug to recover queued work.",
@@ -264,7 +308,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   server.registerTool(
     "anyhook_events",
     {
-      annotations: { readOnlyHint: true },
+      annotations: TOOL_ANNOTATIONS.anyhook_events,
       title: "List recent webhook events",
       description:
         "List webhook events, most recent first: id, app, type, status, attempt, destination " +
@@ -285,7 +329,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   server.registerTool(
     "anyhook_inspect",
     {
-      annotations: { readOnlyHint: true },
+      annotations: TOOL_ANNOTATIONS.anyhook_inspect,
       title: "Inspect a specific event",
       description:
         "Full detail for one event by id, including the inbound headers and body that " +
@@ -308,7 +352,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     server.registerTool(
       "anyhook_simulate",
       {
-        annotations: { readOnlyHint: false, destructiveHint: false },
+        annotations: TOOL_ANNOTATIONS.anyhook_simulate,
         title: "Simulate an incoming webhook (local only)",
         description:
           "Generate a mocked webhook AND insert it into the local memory store, so list/inspect flows can be exercised without a real provider. " +

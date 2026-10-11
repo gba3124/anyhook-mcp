@@ -9,13 +9,15 @@
     "overrides": {
       "@hono/node-server": ">=2.0.10",
       "esbuild": ">=0.28.1",
-      "fast-uri": ">=3.1.6 <4",
+      "fast-uri": ">=3.1.8 <4",
       "hono": ">=4.13.5 <5",
-      "ip-address": ">=10.3.1",
+      "ip-address": ">=10.7.1 <11",
       "nanoid": ">=3.3.18 <4",
       "qs": ">=6.16.0 <7",
       "postcss": ">=8.5.10",
-      "body-parser": ">=2.3.0"
+      "body-parser": ">=2.3.0",
+      "proxy-addr": ">=2.0.8 <3",
+      "source-map-js": ">=1.2.2 <2"
     }
   }
 }

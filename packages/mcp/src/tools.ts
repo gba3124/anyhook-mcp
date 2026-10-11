@@ -113,6 +113,22 @@ export const appsCreateSchema = {
     .describe("Destination URLs that should receive forwarded events."),
 };
 
+export const connectSchema = {
+  ...apiKeyParam,
+  provider_key: z
+    .string()
+    .describe(
+      "A Stripe secret or restricted key (sk_… / rk_…) or a GitHub token (github_pat_… / ghp_…). " +
+        "The provider is read from the key. Used once to register the webhook at the provider; AnyHook does not store it. " +
+        "Least privilege: a Stripe restricted key with Webhook Endpoints = Write, or a fine-grained GitHub token with Webhooks = Read and write."
+    ),
+  appSlug: z.string().optional().describe("Connect this existing app. Omit to create a new app for the provider."),
+  target: z
+    .string()
+    .optional()
+    .describe('GitHub only: "owner/repo", or an organization name for an org-wide hook. Optional when the token administers exactly one repository.'),
+};
+
 export const appUndeliveredSchema = {
   ...apiKeyParam,
   appSlug: z.string(),
@@ -414,6 +430,23 @@ export async function handleAppsCreate(
     const result = await client.createApp(input);
     return asTextContent(result);
   } catch (err) {
+    return asApiError(err);
+  }
+}
+
+export async function handleConnect(
+  input: { provider_key: string; appSlug?: string; target?: string },
+  client: AnyHookClient
+) {
+  try {
+    const result = await client.connect({ key: input.provider_key, app: input.appSlug, target: input.target });
+    return asTextContent(result);
+  } catch (err) {
+    // The route answers failures as { error, detail, fix, candidates? }; pass all
+    // of it through so the agent can act on the fix instead of a bare code.
+    if (err instanceof AnyHookApiError && err.body && typeof err.body === "object") {
+      return asErrorContent(JSON.stringify({ status: err.status, ...(err.body as Record<string, unknown>) }, null, 2));
+    }
     return asApiError(err);
   }
 }

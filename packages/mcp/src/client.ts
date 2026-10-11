@@ -153,6 +153,18 @@ export class AnyHookClient {
     });
   }
 
+  /**
+   * Register an app's inbound URL with Stripe or GitHub using the provider's
+   * own key, and save the signing secret it yields. The key rides this one
+   * request; the API does not store it. Without `app`, a new app is created.
+   */
+  async connect(input: { key: string; app?: string; target?: string }): Promise<unknown> {
+    return this.request(`/api/v1/connect`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
   async listUndelivered(
     appSlug: string,
     limit?: number

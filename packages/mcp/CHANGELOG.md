@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.3.0]: 2026-10-12
+
+### Added
+- `anyhook_connect`: a Stripe key or GitHub token registers the app's inbound URL as a webhook at the provider and saves the signing secret, so events are verified from the first one. The key is used once and not stored.
+
+### Changed
+- The README leads with the hosted endpoint, `https://anyhook.net/mcp`: Claude Code, claude.ai, Codex and VS Code connect to it with a browser sign-in and no key. The keyless local mode is described as what it is, a new 7-day endpoint rather than the account you already have.
+- `@modelcontextprotocol/sdk` raised to ^1.31 (tested on 1.32.1).
+
+### Fixed
+- `anyhook_replay` said replays do not consume quota. They sit outside the monthly quota but within a daily replay limit, and replaying an event held for quota bills it as new.
+- The README's remote section offered a keyless `anyhook_quickstart` the hosted endpoint does not have, its API key link pointed at a page that does not exist, and it told Claude Code users to edit `~/.claude/mcp.json`, which Claude Code does not read.
+
+## [0.2.4]: 2026-09-17
+
+### Added
+- Every tool declares MCP annotations (read-only, destructive, open-world), so a client can tell which calls change something on someone else's server before it makes them.
+
 ## [0.2.3]: 2026-08-26
 
 ### Fixed
