@@ -6,7 +6,13 @@ Apache 2.0 · `npm i -g anyhook-mcp`
 
 ---
 
-## Zero-config (new in 0.2.0)
+## Already have an AnyHook account?
+
+Connect the hosted endpoint instead of running anything: add `https://anyhook.net/mcp`
+to Claude Code, claude.ai, Codex or VS Code and sign in through the browser, no key
+to copy. Steps for each app: <https://anyhook.net/mcp>.
+
+## No account yet (local mode)
 
 No API key needed to start:
 
@@ -17,7 +23,8 @@ claude mcp add anyhook -- npx -y anyhook-mcp
 Then ask your agent to run **`anyhook_quickstart`**, it creates a free relay
 endpoint + API key instantly (no signup), and this MCP session auto-connects.
 All account tools (events, replay, apps) work immediately. The response includes
-a `claim_url` to keep the endpoint permanently.
+a `claim_url` to keep the endpoint permanently; unclaimed, it expires in 7 days.
+It is a new endpoint, not an account you already have.
 
 ## What it does
 
@@ -25,9 +32,10 @@ Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent c
 
 - `anyhook_apps_list`, see every app in your AnyHook account with its inbound URL
 - `anyhook_apps_create`, spin up a new app from a prompt
+- `anyhook_connect`, give a Stripe key or GitHub token: the webhook is registered at the provider and signature-checked from the first event (the key is not stored)
 - `anyhook_events`, list recent events, filter by app / status
 - `anyhook_inspect`, pull a single event's headers, body, signature status
-- `anyhook_replay`, re-send a stored event to its destinations (does not burn quota)
+- `anyhook_replay`, re-send a stored event to its destinations (outside the monthly quota, within a daily replay limit; an event held for quota counts as new)
 - `anyhook_undelivered`, list events that never reached a destination
 - `anyhook_replay_failed`, bulk-replay every failed event for an app
 - `anyhook_mock`, generate a signed Stripe / GitHub / Slack payload for local handler testing
@@ -56,7 +64,7 @@ npm install -g anyhook-mcp
 npx -y anyhook-mcp
 ```
 
-Get an API key from <https://anyhook.net/dashboard/settings/api-keys>. Keys start with `ahk_live_`.
+Get an API key from <https://anyhook.net/dashboard/settings>. Keys start with `ahk_live_`.
 
 ---
 
@@ -108,24 +116,23 @@ Open `Settings → MCP → Add new MCP server`. Or edit `~/.cursor/mcp.json`:
 claude mcp add anyhook -e ANYHOOK_API_KEY=ahk_live_xxxxxxxx -- npx -y anyhook-mcp
 ```
 
-Or edit `~/.claude/mcp.json` directly with the same structure as above.
+Or add the same `mcpServers` entry to your project's `.mcp.json`.
 
 ---
 
 ## Remote endpoint (no local process)
 
 The same server is hosted at `https://anyhook.net/mcp` (streamable HTTP,
-stateless). Use it from claude.ai custom connectors, ChatGPT, or any client
-that speaks HTTP, nothing to install:
+stateless). Claude Code, claude.ai, Codex and VS Code sign in through the
+browser (OAuth), no key to copy: <https://anyhook.net/mcp> has the steps for
+each. Any other client sends `Authorization: Bearer ahk_live_...` with a key
+from the dashboard:
 
 ```json
-{ "mcpServers": { "anyhook": { "url": "https://anyhook.net/mcp" } } }
+{ "mcpServers": { "anyhook": { "url": "https://anyhook.net/mcp", "headers": { "Authorization": "Bearer ahk_live_..." } } } }
 ```
 
-Auth per request: send `Authorization: Bearer ahk_live_...`, or connect
-keyless and call `anyhook_quickstart`, it returns an `api_key` you then pass
-as an argument on account tool calls (the transport is stateless, so the
-session can't hold it for you).
+The endpoint has no `anyhook_quickstart`: that tool exists only in local mode.
 
 ---
 
@@ -180,7 +187,7 @@ Calls `anyhook_mock` with `targetUrl` set; returns the request that was sent + y
 
 | Var | Required | Default | Purpose |
 |---|---|---|---|
-| `ANYHOOK_API_KEY` | for remote mode | - | `ahk_live_*` from <https://anyhook.net/dashboard/settings/api-keys> |
+| `ANYHOOK_API_KEY` | for remote mode | - | `ahk_live_*` from <https://anyhook.net/dashboard/settings> |
 | `ANYHOOK_API_BASE` | no | `https://anyhook.net` | Override for self-hosted AnyHook deployments |
 
 ---
