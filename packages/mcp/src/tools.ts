@@ -135,6 +135,59 @@ export const appUndeliveredSchema = {
   limit: z.number().int().min(1).max(200).optional(),
 };
 
+export const codeGetSchema = {
+  ...apiKeyParam,
+  appSlug: z.string().describe("The app whose code handler to read."),
+};
+
+export const codeDeploySchema = {
+  ...apiKeyParam,
+  appSlug: z.string().describe("The app whose events the code runs on."),
+  code: z
+    .string()
+    .describe(
+      "An ES module, run in a sandboxed Node.js on every event this app receives. Either " +
+        "`export default async function (event, { env }) {}` (event: { method, headers, body, raw_body, delivery_id, attempt }; " +
+        "method is always POST, and the query string, path and caller IP are not kept) " +
+        "or a Pipedream Node.js code step: `export default defineComponent({ async run({ steps, $ }) {} })`, where " +
+        "steps.trigger.event is that same event (a step reading query, path, url or client_ip needs changing) and " +
+        "$.export and $.flow.exit work. npm packages it imports are installed on deploy " +
+        "(pin as \"pkg@1.2.3\", like Pipedream; a new package list usually takes seconds, a large one a few minutes). @pipedream/platform is a stand-in. " +
+        "State between events: the app's store (store.get/set/has/delete/keys, set takes { ttl }); every data_store prop is that one store, " +
+        "an app prop's this.<prop>.$auth.<field> reads the secret <APP>_<FIELD>, any other prop the secret named after it (channelId → CHANNEL_ID). " +
+        "Throwing fails the delivery, which AnyHook retries. Templates for common actions (Slack, email, Google Sheets, " +
+        "Notion, Claude and more): https://anyhook.net/code-templates.md"
+    ),
+  secrets: z
+    .record(z.string(), z.string().nullable())
+    .optional()
+    .describe("Environment variables for the code, read as env.NAME or process.env.NAME. Merged into the saved ones; null removes a name."),
+  schedule: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Also run on a cron schedule: five fields, UTC unless prefixed CRON_TZ=Area/City, e.g. \"*/15 * * * *\". " +
+        "Each firing arrives as an anyhook.schedule event and counts as a run. null removes it; omit to keep it. " +
+        "Only on an app that does not verify a sender's signature."
+    ),
+  enabled: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether events run the code. false saves it switched off, so it runs only through anyhook_code_test. " +
+        "Omit: a first deploy goes live and later deploys keep the current state. Deploy off while another system " +
+        "still handles the same events, or both will act on each one."
+    ),
+};
+
+export const codeTestSchema = {
+  ...apiKeyParam,
+  appSlug: z.string(),
+  event_id: z.string().optional().describe("Run on this stored event. Omit for the app's latest event."),
+  body: z.unknown().optional().describe("Run on this body instead of a stored event."),
+};
+
 export const appReplayFailedSchema = {
   ...apiKeyParam,
   appSlug: z.string().describe("Bulk-replay every failed event for this app."),
@@ -459,6 +512,42 @@ export async function handleAppUndelivered(
     const result = await client.listUndelivered(input.appSlug, input.limit);
     return asTextContent(result);
   } catch (err) {
+    return asApiError(err);
+  }
+}
+
+export async function handleCodeGet(input: { appSlug: string }, client: AnyHookClient) {
+  try {
+    return asTextContent(await client.getCode(input.appSlug));
+  } catch (err) {
+    return asApiError(err);
+  }
+}
+
+export async function handleCodeDeploy(
+  input: { appSlug: string; code: string; secrets?: Record<string, string | null>; schedule?: string | null; enabled?: boolean },
+  client: AnyHookClient
+) {
+  try {
+    return asTextContent(
+      await client.putCode(input.appSlug, { code: input.code, secrets: input.secrets, schedule: input.schedule, enabled: input.enabled })
+    );
+  } catch (err) {
+    // The route explains refusals (plan, size, secret names); pass them through.
+    if (err instanceof AnyHookApiError && err.body && typeof err.body === "object") {
+      return asErrorContent(JSON.stringify({ status: err.status, ...(err.body as Record<string, unknown>) }, null, 2));
+    }
+    return asApiError(err);
+  }
+}
+
+export async function handleCodeTest(input: { appSlug: string; event_id?: string; body?: unknown }, client: AnyHookClient) {
+  try {
+    return asTextContent(await client.testCode(input.appSlug, { event_id: input.event_id, body: input.body }));
+  } catch (err) {
+    if (err instanceof AnyHookApiError && err.body && typeof err.body === "object") {
+      return asErrorContent(JSON.stringify({ status: err.status, ...(err.body as Record<string, unknown>) }, null, 2));
+    }
     return asApiError(err);
   }
 }

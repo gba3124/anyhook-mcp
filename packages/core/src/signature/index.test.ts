@@ -226,6 +226,14 @@ describe("verifySignature, all providers", () => {
     expect(await verifySignature("shopify", headers, body, secret, url)).toBe(true);
   });
 
+  it("verifies Xero signature (base64 HMAC-SHA256 of raw body, webhooks key)", async () => {
+    const sig = await hmacBase64(body, secret, "SHA-256");
+    expect(await verifySignature("xero", new Headers({ "x-xero-signature": sig }), body, secret, url)).toBe(true);
+    expect(await verifySignature("xero", new Headers({ "x-xero-signature": sig }), body + "x", secret, url)).toBe(false);
+    expect(await verifySignature("xero", new Headers(), body, secret, url)).toBe(false);
+    expect(detectSource(new Headers({ "x-xero-signature": sig }))).toBe("xero");
+  });
+
   it("verifies LINE signature (base64 HMAC-SHA256 of raw body, channel secret)", async () => {
     const sig = await hmacBase64(body, secret, "SHA-256");
     const headers = new Headers({ "x-line-signature": sig });

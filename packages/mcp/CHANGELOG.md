@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.0]: 2026-10-20
+
+### Added
+- `anyhook_code_deploy`, `anyhook_code_get` and `anyhook_code_test` (with an API key, on Pro and Scale): save a handler that runs on every event an app receives, in a sandbox, with AnyHook's retries and replay around it; read it back; run it on a stored event. It can also run on a cron schedule. A Pipedream Node.js code step runs with the changes the tool description lists: npm packages are installed on save, `data_store` props use the app's store, and an app prop's `$auth` reads a secret. Common actions start from https://anyhook.net/code-templates.md.
+
+### Changed
+- `anyhook_verify` covers every source the AnyHook edge verifies, Xero included.
+- The server reports its own version in the MCP handshake; it said 0.2.4 through 0.3.0.
+
 ## [0.3.0]: 2026-10-12
 
 ### Added

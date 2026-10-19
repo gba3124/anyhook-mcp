@@ -26,13 +26,16 @@ function parseToolResult(result: unknown): unknown {
 }
 
 describe("MCP server integration", () => {
-  it("exposes all 14 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
+  it("exposes all 17 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
     const { client } = await setupClient();
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "anyhook_apps_create",
       "anyhook_apps_list",
+      "anyhook_code_deploy",
+      "anyhook_code_get",
+      "anyhook_code_test",
       "anyhook_connect",
       "anyhook_events",
       "anyhook_inbox",

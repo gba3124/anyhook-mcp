@@ -50,6 +50,12 @@ import {
   appReplayFailedSchema,
   connectSchema,
   handleConnect,
+  codeGetSchema,
+  codeDeploySchema,
+  codeTestSchema,
+  handleCodeGet,
+  handleCodeDeploy,
+  handleCodeTest,
 } from "./tools";
 
 /**
@@ -72,6 +78,9 @@ export const TOOL_ANNOTATIONS = {
   anyhook_events: { readOnlyHint: true },
   anyhook_inspect: { readOnlyHint: true },
   anyhook_simulate: { readOnlyHint: false, destructiveHint: false },
+  anyhook_code_get: { readOnlyHint: true },
+  anyhook_code_deploy: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_code_test: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
 } as const;
 
 export type ServerOptions = {
@@ -103,7 +112,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     opts.client ?? (config.mode === "remote" && config.apiKey ? new AnyHookClient(config) : null);
 
   const server = new McpServer(
-    { name: "anyhook", version: "0.2.4" },
+    { name: "anyhook", version: "0.4.0" },
     { capabilities: { tools: {} } }
   );
 
@@ -127,8 +136,8 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       annotations: TOOL_ANNOTATIONS.anyhook_verify,
       title: "Verify a webhook signature",
       description:
-        "Verify a webhook signature against a secret. Supports 20 providers including " +
-        "stripe, github, shopify, slack, line, discord, linear, vercel, paddle, hubspot, and paypal.",
+        "Verify a webhook signature against a secret, for every source the AnyHook edge verifies, including " +
+        "stripe, github, shopify, slack, line, discord, linear, vercel, paddle, hubspot, paypal and xero.",
       inputSchema: verifySchema,
     },
     async (input) => handleVerify(input)
@@ -300,6 +309,58 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       async (input) => {
         if (!client) return noKeyError();
         return handleAppReplayFailed(input, client);
+      }
+    );
+
+    server.registerTool(
+      "anyhook_code_get",
+      {
+        annotations: TOOL_ANNOTATIONS.anyhook_code_get,
+        title: "Read an app's code handler",
+        description:
+          "The code that runs on this app's events: its source, the names of its secrets (never the values), " +
+          "whether events are reaching it, and runs used this month against the plan's limit.",
+        inputSchema: codeGetSchema,
+      },
+      async (input) => {
+        if (!client) return noKeyError();
+        return handleCodeGet(input, client);
+      }
+    );
+
+    server.registerTool(
+      "anyhook_code_deploy",
+      {
+        annotations: TOOL_ANNOTATIONS.anyhook_code_deploy,
+        title: "Deploy code that runs on an app's events",
+        description:
+          "Save a handler that runs on every event this app receives, in an isolated sandbox, with AnyHook's " +
+          "retries and replay around it: no server of your own. Each run's console output and return value are " +
+          "stored as that delivery's response (anyhook_inspect shows them). It can also run on a cron schedule. " +
+          "Pro and Scale; runs are capped per month with no overage, and retries, test runs and schedule firings each count. " +
+          "Test it with anyhook_code_test before real events arrive.",
+        inputSchema: codeDeploySchema,
+      },
+      async (input) => {
+        if (!client) return noKeyError();
+        return handleCodeDeploy(input, client);
+      }
+    );
+
+    server.registerTool(
+      "anyhook_code_test",
+      {
+        annotations: TOOL_ANNOTATIONS.anyhook_code_test,
+        title: "Run an app's code on a stored event",
+        description:
+          "Run the saved handler now and return its logs, return value and duration: on a stored event " +
+          "(the latest when event_id is omitted) or on a body you give. Counts as a run. Nothing is delivered, " +
+          "but whatever the code itself sends does happen.",
+        inputSchema: codeTestSchema,
+      },
+      async (input) => {
+        if (!client) return noKeyError();
+        return handleCodeTest(input, client);
       }
     );
   }

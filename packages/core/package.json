@@ -19,7 +19,7 @@
     "stripe": "^23.0.0",
     "svix": "^1.99.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3"
   },
   "repository": {
     "type": "git",

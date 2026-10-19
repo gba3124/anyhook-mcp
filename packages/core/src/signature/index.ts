@@ -35,6 +35,7 @@ export type Provider =
   | "hubspot"
   | "woocommerce"
   | "paypal"
+  | "xero"
   | "generic";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -56,6 +57,7 @@ export function detectSource(headers: Headers): string {
   if (headers.get("sentry-hook-signature")) return "sentry";
   if (headers.get("x-twilio-email-event-webhook-signature")) return "sendgrid";
   if (headers.get("x-shopify-hmac-sha256")) return "shopify";
+  if (headers.get("x-xero-signature")) return "xero";
   if (headers.get("x-hubspot-signature-v3") || headers.get("x-hubspot-signature")) return "hubspot";
   if (headers.get("x-wc-webhook-signature")) return "woocommerce";
   if (headers.get("paypal-transmission-sig")) return "paypal";
@@ -784,6 +786,11 @@ export async function verifySignature(
     }
     case "shopify": {
       const sig = headers.get("x-shopify-hmac-sha256");
+      return sig ? verifyShopify(body, sig, secret) : false;
+    }
+    case "xero": {
+      // Shopify's scheme again: base64(HMAC-SHA256(webhooks key, raw body)).
+      const sig = headers.get("x-xero-signature");
       return sig ? verifyShopify(body, sig, secret) : false;
     }
     case "line": {

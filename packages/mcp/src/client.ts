@@ -181,4 +181,28 @@ export class AnyHookClient {
       { method: "POST" }
     );
   }
+
+  /** The app's code handler: its source, secret names and runs this month. */
+  async getCode(appSlug: string): Promise<unknown> {
+    return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/code`);
+  }
+
+  /** Save the handler; secrets merge (null removes one), schedule is a cron or null. The app starts sending its events to it. */
+  async putCode(
+    appSlug: string,
+    input: { code: string; secrets?: Record<string, string | null>; schedule?: string | null; enabled?: boolean }
+  ): Promise<unknown> {
+    return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/code`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Run the saved handler now on a stored event (latest by default) or a given body. */
+  async testCode(appSlug: string, input: { event_id?: string; body?: unknown }): Promise<unknown> {
+    return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/code/test`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
 }
