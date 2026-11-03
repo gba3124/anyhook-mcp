@@ -58,6 +58,18 @@ export type RemoteApp = {
   createdAt?: string;
 };
 
+/** What POST /api/v1/apps/{slug}/listen answers. */
+export type ListenSession = {
+  inbound_url: string;
+  /** wss URL for the relay, signed and good until connect_expires_at (unix seconds). */
+  connect_url: string;
+  connect_expires_at: number;
+  /** The app's other enabled destinations, which keep getting every event. */
+  other_destinations: number;
+  /** Set on a keyless account, which is deleted at expires_at unless claimed. */
+  temporary: { expires_at: string; claim_url: string } | null;
+};
+
 export class AnyHookClient {
   constructor(private readonly cfg: McpConfig) {
     if (!cfg.apiKey) {
@@ -138,6 +150,11 @@ export class AnyHookClient {
     });
   }
 
+  /** Put the app's `listen` destination in place and get a URL to connect to it. */
+  async listen(appSlug: string): Promise<ListenSession> {
+    return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/listen`, { method: "POST" });
+  }
+
   async listApps(): Promise<{ apps: RemoteApp[] }> {
     return this.request(`/api/v1/apps`);
   }
@@ -175,10 +192,14 @@ export class AnyHookClient {
     );
   }
 
-  async replayFailedForApp(appSlug: string): Promise<unknown> {
+  /** Failed events oldest first, received after `since` (default: 24 hours ago), at most `limit` (default 50, up to 100). */
+  async replayFailedForApp(
+    appSlug: string,
+    opts: { since?: string; limit?: number } = {}
+  ): Promise<unknown> {
     return this.request(
       `/api/v1/apps/${encodeURIComponent(appSlug)}/replay-failed`,
-      { method: "POST" }
+      { method: "POST", body: JSON.stringify(opts) }
     );
   }
 
@@ -199,6 +220,11 @@ export class AnyHookClient {
   }
 
   /** Run the saved handler now on a stored event (latest by default) or a given body. */
+  /** The plan's limits and this account's use of each: events, overage, compute, API calls, code runs. */
+  async usage(): Promise<unknown> {
+    return this.request(`/api/v1/usage`);
+  }
+
   async testCode(appSlug: string, input: { event_id?: string; body?: unknown }): Promise<unknown> {
     return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/code/test`, {
       method: "POST",

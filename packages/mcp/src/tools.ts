@@ -26,7 +26,7 @@ export const mockSchema = {
     .describe("Webhook provider to simulate."),
   event: z.string()
     .describe("Event name (e.g. 'payment_intent.succeeded' for Stripe)."),
-  data: z.record(z.unknown()).optional()
+  data: z.record(z.string(), z.unknown()).optional()
     .describe("Optional fields to deep-merge into the fixture."),
   secret: z.string().optional()
     .describe("Signing secret. Falls back to a deterministic default per provider."),
@@ -37,7 +37,7 @@ export const mockSchema = {
 export const verifySchema = {
   provider: z.string()
     .describe("Provider name (e.g. 'stripe', 'github', 'slack', 'generic')."),
-  headers: z.record(z.string())
+  headers: z.record(z.string(), z.string())
     .describe("Request headers as a flat object."),
   body: z.string()
     .describe("Raw request body."),
@@ -58,7 +58,7 @@ export const providersSchema = {};
 export const eventsSimulateSchema = {
   provider: z.enum(["stripe", "github", "slack"]),
   event: z.string(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
   secret: z.string().optional(),
 };
 
@@ -77,13 +77,13 @@ export const eventsListUnifiedSchema = {
   appSlug: z.string().optional().describe("Filter to a specific app slug (account mode)."),
   source: z.string().optional().describe("Filter by provider source (local mode)."),
   status: z.string().optional()
-    .describe("Filter by status. Account mode: queued|success|retrying|failed. Local mode: received|forwarded|failed|retrying."),
+    .describe("Filter by status. Account mode: queued|success|retrying|failed|rejected|circuit_open|quota_exceeded. Local mode: received|forwarded|failed|retrying."),
   limit: z.number().int().min(1).max(200).optional(),
 };
 
 export const eventReplaySchema = {
   ...apiKeyParam,
-  id: z.string().describe("Event ID to replay. Replay does not consume event quota."),
+  id: z.string().describe("Event ID to replay. Replay does not consume event quota; it is charged to the compute allowance."),
 };
 
 export const appsListSchema = { ...apiKeyParam };
@@ -188,9 +188,13 @@ export const codeTestSchema = {
   body: z.unknown().optional().describe("Run on this body instead of a stored event."),
 };
 
+export const usageSchema = { ...apiKeyParam };
+
 export const appReplayFailedSchema = {
   ...apiKeyParam,
-  appSlug: z.string().describe("Bulk-replay every failed event for this app."),
+  appSlug: z.string().describe("The app whose failed events to replay."),
+  since: z.string().optional().describe("Only events received after this ISO 8601 time. Default: 24 hours ago."),
+  limit: z.number().int().min(1).max(100).optional().describe("Most events to replay in this call, 1 to 100. Default 50."),
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -211,10 +215,18 @@ function asTextContent(value: unknown): ToolResult {
   };
 }
 
-function asErrorContent(message: string): ToolResult {
+/**
+ * Every failure reads the same way, `{ error, detail?, fix? }` as JSON, the
+ * shape the API refuses in, so an agent parses one thing whether the refusal
+ * came from a route, the network or this package.
+ */
+function asErrorContent(problem: string | Record<string, unknown>): ToolResult {
   return {
     isError: true,
-    content: [{ type: "text" as const, text: message }],
+    content: [{
+      type: "text" as const,
+      text: JSON.stringify(typeof problem === "string" ? { error: problem } : problem, null, 2),
+    }],
   };
 }
 
@@ -315,7 +327,7 @@ export async function handleEventInspect(
   store: EventStore
 ) {
   const event = await store.get(input.id);
-  if (!event) return asErrorContent(`No event with id '${input.id}'`);
+  if (!event) return asErrorContent({ error: `No event with id '${input.id}'.`, fix: "anyhook_events lists the ids in this session's store." });
   return asTextContent({
     ...event,
     receivedAt: event.receivedAt.toISOString(),
@@ -378,7 +390,12 @@ export async function handleEventsSimulate(
 
 function asApiError(err: unknown) {
   if (err instanceof AnyHookApiError) {
-    return asErrorContent(`AnyHook API ${err.status}: ${err.message}`);
+    // Routes answer refusals as { error, detail?, fix?, ... }: a limit names
+    // itself and what to do about it, so the agent gets all of it, not a bare code.
+    if (err.body && typeof err.body === "object") {
+      return asErrorContent({ status: err.status, ...(err.body as Record<string, unknown>) });
+    }
+    return asErrorContent({ status: err.status, error: err.message });
   }
   return asErrorContent(err instanceof Error ? err.message : String(err));
 }
@@ -407,9 +424,11 @@ export async function handleEventInspectRemote(
     return asTextContent(event);
   } catch (err) {
     if (err instanceof Error && /\b404\b|not found/i.test(err.message)) {
-      return asErrorContent(
-        `No event with id '${input.id}'. Use anyhook_events to list recent event ids.`
-      );
+      return asErrorContent({
+        status: 404,
+        error: `No event with id '${input.id}'.`,
+        fix: "anyhook_events lists recent event ids.",
+      });
     }
     return asApiError(err);
   }
@@ -495,11 +514,6 @@ export async function handleConnect(
     const result = await client.connect({ key: input.provider_key, app: input.appSlug, target: input.target });
     return asTextContent(result);
   } catch (err) {
-    // The route answers failures as { error, detail, fix, candidates? }; pass all
-    // of it through so the agent can act on the fix instead of a bare code.
-    if (err instanceof AnyHookApiError && err.body && typeof err.body === "object") {
-      return asErrorContent(JSON.stringify({ status: err.status, ...(err.body as Record<string, unknown>) }, null, 2));
-    }
     return asApiError(err);
   }
 }
@@ -533,10 +547,6 @@ export async function handleCodeDeploy(
       await client.putCode(input.appSlug, { code: input.code, secrets: input.secrets, schedule: input.schedule, enabled: input.enabled })
     );
   } catch (err) {
-    // The route explains refusals (plan, size, secret names); pass them through.
-    if (err instanceof AnyHookApiError && err.body && typeof err.body === "object") {
-      return asErrorContent(JSON.stringify({ status: err.status, ...(err.body as Record<string, unknown>) }, null, 2));
-    }
     return asApiError(err);
   }
 }
@@ -545,20 +555,27 @@ export async function handleCodeTest(input: { appSlug: string; event_id?: string
   try {
     return asTextContent(await client.testCode(input.appSlug, { event_id: input.event_id, body: input.body }));
   } catch (err) {
-    if (err instanceof AnyHookApiError && err.body && typeof err.body === "object") {
-      return asErrorContent(JSON.stringify({ status: err.status, ...(err.body as Record<string, unknown>) }, null, 2));
-    }
+    return asApiError(err);
+  }
+}
+
+export async function handleUsage(_input: unknown, client: AnyHookClient) {
+  try {
+    return asTextContent(await client.usage());
+  } catch (err) {
     return asApiError(err);
   }
 }
 
 export async function handleAppReplayFailed(
-  input: { appSlug: string },
+  input: { appSlug: string; since?: string; limit?: number },
   client: AnyHookClient
 ) {
   try {
-    const result = await client.replayFailedForApp(input.appSlug);
-    return asTextContent({ replayed: true, appSlug: input.appSlug, response: result });
+    const result = await client.replayFailedForApp(input.appSlug, { since: input.since, limit: input.limit });
+    // The API's own counts, as they are: `replayed: true` here once read as
+    // success with nothing replayed, and hid `more` from the agent.
+    return asTextContent({ appSlug: input.appSlug, ...(result as Record<string, unknown>) });
   } catch (err) {
     return asApiError(err);
   }

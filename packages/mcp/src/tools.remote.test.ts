@@ -15,6 +15,7 @@ import {
   handleAppUndelivered,
   handleAppReplayFailed,
   handleConnect,
+  handleUsage,
   type ToolResult,
 } from "./tools";
 import { AnyHookApiError, type AnyHookClient } from "./client";
@@ -182,13 +183,24 @@ describe("handleAppUndelivered + handleAppReplayFailed", () => {
     expect(parse(result).events[0].id).toBe("u1");
   });
 
-  it("bulk-replays failed events", async () => {
+  it("bulk-replays failed events and passes on whether more are waiting", async () => {
     const client = fakeClient({
-      replayFailedForApp: vi.fn().mockResolvedValue({ queued: 7 }),
+      replayFailedForApp: vi.fn().mockResolvedValue({ replayed: 50, events: [], skipped: [], more: true }),
+    });
+    const result = await handleAppReplayFailed({ appSlug: "billing", since: "2026-10-01T00:00:00Z", limit: 50 }, client);
+    expect(client.replayFailedForApp).toHaveBeenCalledWith("billing", { since: "2026-10-01T00:00:00Z", limit: 50 });
+    expect(parse(result)).toMatchObject({ appSlug: "billing", replayed: 50, more: true });
+  });
+
+  it("errors are one JSON shape with the API's fix kept", async () => {
+    const client = fakeClient({
+      replayFailedForApp: vi.fn().mockRejectedValue(
+        new AnyHookApiError(429, "Rate limit exceeded", { error: "Rate limit exceeded", fix: "Wait 12s, then try again." }),
+      ),
     });
     const result = await handleAppReplayFailed({ appSlug: "billing" }, client);
-    expect(client.replayFailedForApp).toHaveBeenCalledWith("billing");
-    expect(parse(result).appSlug).toBe("billing");
+    expect(result.isError).toBe(true);
+    expect(parse(result)).toEqual({ status: 429, error: "Rate limit exceeded", fix: "Wait 12s, then try again." });
   });
 });
 
@@ -214,5 +226,23 @@ describe("handleConnect", () => {
     expect(result.isError).toBe(true);
     expect(parse(result)).toMatchObject({ status: 403, error: "missing_permission", fix: "Webhook Endpoints = Write" });
     expect(result.content[0].text).not.toContain(key);
+  });
+});
+
+describe("handleUsage", () => {
+  it("returns the usage endpoint's answer as is", async () => {
+    const client = fakeClient({ usage: vi.fn().mockResolvedValue({ plan: "pro", api_calls: { today: 3, limit: 1000 } }) });
+    expect(parse(await handleUsage(undefined, client))).toMatchObject({ plan: "pro", api_calls: { today: 3 } });
+  });
+
+  it("a limit from any tool reaches the agent with its detail and fix", async () => {
+    const client = fakeClient({
+      listEvents: vi.fn().mockRejectedValue(
+        new AnyHookApiError(429, "api_limit", { error: "api_limit", limit: 300, detail: "300 API calls a day on free", fix: "Wait for the reset" })
+      ),
+    });
+    const result = await handleEventsListRemote({}, client);
+    expect(result.isError).toBe(true);
+    expect(parse(result)).toMatchObject({ status: 429, error: "api_limit", limit: 300, fix: "Wait for the reset" });
   });
 });

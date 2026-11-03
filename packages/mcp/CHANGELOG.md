@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.5.0]: 2026-11-04
+
+### Added
+- `npx -y anyhook-mcp listen 3000`: a public webhook URL that forwards to this machine, with no account. The URL survives a restart, the bytes arrive unchanged so provider signatures verify, and events are stored, retried and replayable. Webhooks only, not a general tunnel. Needs Node 22 or newer; the MCP server itself still runs on Node 20.
+- `anyhook_usage`: the plan's limits and this account's use of each (events, overage, the compute allowance and what used it, API calls today, code runs, package snapshots), with when each resets.
+
+### Changed
+- An API refusal reaches the agent whole (`error`, `detail`, `fix` and whatever else the route sent) from every account tool, not only from connect and the code tools, so a limit says which one it is and what to do.
+- Every tool error is one JSON shape, `{ "error", "detail"?, "fix"? }` (plus `status` when the API refused), including network errors and this package's own; some used to be plain text.
+- `anyhook_replay_failed` takes `since` and `limit` and returns the API's answer as it is: what was replayed, what was skipped and why, and `more: true` while failed events are still waiting. It used to report `replayed: true` even when nothing was replayed, and its description promised every failed event, when one call takes those from the last 24 hours, at most 50.
+
 ## [0.4.0]: 2026-10-20
 
 ### Added

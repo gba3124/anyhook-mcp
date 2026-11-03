@@ -8,6 +8,17 @@ Source for the npm packages that go with [AnyHook](https://anyhook.net), a webho
 | [`anyhook-verify`](packages/verify) | [![npm](https://img.shields.io/npm/v/anyhook-verify)](https://www.npmjs.com/package/anyhook-verify) | Verify `AnyHook-Signature` headers on your server (HMAC-SHA256, retry-safe) |
 | `@anyhook/core` | not published | Shared internals (signature logic, provider fixtures), bundled into the two above |
 
+## Forward webhooks to localhost
+
+```bash
+npx -y anyhook-mcp listen 3000
+```
+
+Prints a public webhook URL and forwards every event to that port, with no
+account. The URL survives a restart, and your server gets the bytes the provider
+sent, so signatures verify. Webhooks only: details in
+[`packages/mcp`](packages/mcp#forward-webhooks-to-localhost).
+
 ## Connect an agent
 
 Already have an AnyHook account? Add `https://anyhook.net/mcp` to Claude Code,

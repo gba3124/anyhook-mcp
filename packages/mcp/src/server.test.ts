@@ -26,7 +26,7 @@ function parseToolResult(result: unknown): unknown {
 }
 
 describe("MCP server integration", () => {
-  it("exposes all 17 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
+  it("exposes all 18 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
     const { client } = await setupClient();
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
@@ -47,6 +47,7 @@ describe("MCP server integration", () => {
       "anyhook_replay_failed",
       "anyhook_simulate",
       "anyhook_undelivered",
+      "anyhook_usage",
       "anyhook_verify",
     ]);
   });

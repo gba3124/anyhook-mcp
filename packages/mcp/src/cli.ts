@@ -4,8 +4,11 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createAnyHookMcpServer } from "./server";
 import { loadConfig } from "./config";
+import { runListen } from "./listen";
 
 async function main() {
+  if (process.argv[2] === "listen") process.exit(await runListen(process.argv.slice(3)));
+
   const config = loadConfig();
   const server = createAnyHookMcpServer({ config });
   const transport = new StdioServerTransport();

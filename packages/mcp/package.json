@@ -1,8 +1,8 @@
 {
   "name": "anyhook-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
-  "description": "AnyHook MCP server, gives AI agents eyes on webhooks (inspect, replay, mock, verify) for Stripe, GitHub, OpenAI, Anthropic, LangChain, and more.",
+  "description": "AnyHook MCP server, gives AI agents eyes on webhooks (inspect, replay, mock, verify) for Stripe, GitHub, OpenAI, Anthropic, LangChain, and more. `listen` forwards webhooks to localhost with no account.",
   "license": "Apache-2.0",
   "author": "Owen Cheng",
   "homepage": "https://anyhook.net",
@@ -19,6 +19,8 @@
     "model-context-protocol",
     "webhook",
     "webhooks",
+    "localhost",
+    "webhook-forwarding",
     "claude",
     "cursor",
     "ai-agent",
@@ -62,8 +64,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.31.0",
-    "zod": "^3.25.76"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@anyhook/core": "workspace:*",

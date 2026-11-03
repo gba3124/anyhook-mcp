@@ -6,6 +6,36 @@ Apache 2.0 · `npm i -g anyhook-mcp`
 
 ---
 
+## Forward webhooks to localhost
+
+A public webhook URL that forwards to your machine, with no account:
+
+```bash
+npx -y anyhook-mcp listen 3000
+```
+
+```text
+Webhook URL   https://in.anyhook.net/q-3fa9c1d2/listen
+Forwards to   http://localhost:3000/
+
+This URL is temporary and lasts until Nov 11. To keep it: https://anyhook.net/claim/...
+
+Paste the URL into Stripe, GitHub or any webhook sender. Ctrl-C to stop.
+While this is stopped, events are logged but not forwarded.
+
+Connected. Waiting for events.
+12:00:03  200  41 ms  invoice.paid
+12:00:19  500  12 ms  invoice.paid  AnyHook retries on its schedule
+```
+
+- **The URL stays.** Restart the command and it is the same URL, so there is nothing to paste into the provider again.
+- **Signatures verify.** Your server gets the bytes the provider sent, so `stripe.webhooks.constructEvent` and friends work as they do in production.
+- **Nothing is lost when your laptop is shut.** Events are stored either way. A failed delivery is retried, and one that arrived while this was stopped can be replayed.
+
+`listen 3000/api/webhooks` sets the path. With `ANYHOOK_API_KEY` set it uses that account, and `--app <slug>` picks the app. Needs Node 22 or newer.
+
+It is for webhooks, not a general tunnel. The sender gets its answer from AnyHook, so your server's response goes to the event log rather than back to the sender. To expose a whole site, use ngrok or Cloudflare Tunnel.
+
 ## Already have an AnyHook account?
 
 Connect the hosted endpoint instead of running anything: add `https://anyhook.net/mcp`
@@ -35,9 +65,10 @@ Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent c
 - `anyhook_connect`, give a Stripe key or GitHub token: the webhook is registered at the provider and signature-checked from the first event (the key is not stored)
 - `anyhook_events`, list recent events, filter by app / status
 - `anyhook_inspect`, pull a single event's headers, body, signature status
-- `anyhook_replay`, re-send a stored event to its destinations (outside the monthly quota, within a daily replay limit; an event held for quota counts as new)
+- `anyhook_replay`, re-send a stored event to its destinations (outside the monthly quota, within a daily replay limit and the compute allowance; an event held for quota counts as new)
 - `anyhook_undelivered`, list events that never reached a destination
-- `anyhook_replay_failed`, bulk-replay every failed event for an app
+- `anyhook_usage`, the plan's limits and what the account has used of each, with when they reset
+- `anyhook_replay_failed`, bulk-replay an app's failed events, oldest first (the last 24 hours and 50 per call by default, up to 100), saying when more are waiting
 - `anyhook_mock`, generate a signed Stripe / GitHub / Slack payload for local handler testing
 - `anyhook_verify`, verify any incoming signature against your secret
 - `anyhook_providers`, list every webhook provider AnyHook supports
