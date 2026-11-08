@@ -5,6 +5,7 @@
  * This is what verifies the whole MCP wiring (schema registration, request
  * routing, response serialization) actually works.
  */
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -25,8 +26,54 @@ function parseToolResult(result: unknown): unknown {
   return JSON.parse(r.content[0].text);
 }
 
+/** Runs the events card's script against a stand-in for the host page. */
+function runCard(html: string) {
+  const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
+  const sent: { id?: number; method: string; params?: { height?: number } }[] = [];
+  const parent = { postMessage: (m: (typeof sent)[number]) => sent.push(m) };
+  const root = { innerHTML: "" };
+  const documentElement = { style: { colorScheme: "" } };
+  let onMessage: (e: unknown) => void = () => {};
+  class ResizeObserver {
+    constructor(private readonly report: () => void) {}
+    observe() { this.report(); }
+  }
+  runInNewContext(script, {
+    ResizeObserver,
+    window: { parent, addEventListener: (_: string, fn: (e: unknown) => void) => { onMessage = fn; } },
+    document: { getElementById: () => root, documentElement, body: { getBoundingClientRect: () => ({ height: 120.4 }) } },
+  });
+  return { sent, root, documentElement, fromHost: (data: unknown) => onMessage({ source: parent, data }) };
+}
+
 describe("MCP server integration", () => {
-  it("exposes all 18 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
+  it("the events card introduces itself and reports its height, or claude.ai never shows it", async () => {
+    const { client } = await setupClient();
+    const { resources } = await client.listResources();
+    const { contents } = await client.readResource({ uri: resources.find((r) => r.name === "anyhook-events-card")!.uri });
+    const card = runCard((contents[0] as { text: string }).text);
+
+    expect(card.sent).toEqual([expect.objectContaining({ id: 1, method: "ui/initialize" })]);
+
+    card.fromHost({ jsonrpc: "2.0", id: 1, result: { hostContext: { theme: "dark" } } });
+    expect(card.sent.map((m) => m.method)).toEqual([
+      "ui/initialize",
+      "ui/notifications/initialized",
+      "ui/notifications/size-changed",
+    ]);
+    expect(card.sent[2].params?.height).toBe(121);
+    expect(card.documentElement.style.colorScheme).toBe("dark");
+
+    card.fromHost({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: { events: [{ id: "abcdefgh12", eventType: "<b>x", status: "failed", source: "stripe" }] } },
+    });
+    expect(card.root.innerHTML).toContain("chip failed");
+    expect(card.root.innerHTML).toContain("&lt;b&gt;x");
+  });
+
+  it("exposes all 19 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
     const { client } = await setupClient();
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
@@ -37,6 +84,7 @@ describe("MCP server integration", () => {
       "anyhook_code_get",
       "anyhook_code_test",
       "anyhook_connect",
+      "anyhook_destination_add",
       "anyhook_events",
       "anyhook_inbox",
       "anyhook_inspect",

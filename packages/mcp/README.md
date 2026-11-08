@@ -62,6 +62,7 @@ Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent c
 
 - `anyhook_apps_list`, see every app in your AnyHook account with its inbound URL
 - `anyhook_apps_create`, spin up a new app from a prompt
+- `anyhook_destination_add`, forward an existing app's events to a URL
 - `anyhook_connect`, give a Stripe key or GitHub token: the webhook is registered at the provider and signature-checked from the first event (the key is not stored)
 - `anyhook_events`, list recent events, filter by app / status
 - `anyhook_inspect`, pull a single event's headers, body, signature status

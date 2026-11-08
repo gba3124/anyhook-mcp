@@ -51,7 +51,9 @@ import {
   appUndeliveredSchema,
   appReplayFailedSchema,
   connectSchema,
+  destinationAddSchema,
   handleConnect,
+  handleDestinationAdd,
   codeGetSchema,
   codeDeploySchema,
   codeTestSchema,
@@ -66,24 +68,25 @@ import {
  * tools and asks for anyhook:write before any other (MCP step-up).
  */
 export const TOOL_ANNOTATIONS = {
-  anyhook_mock: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-  anyhook_verify: { readOnlyHint: true },
-  anyhook_providers: { readOnlyHint: true },
-  anyhook_quickstart: { readOnlyHint: false, destructiveHint: false },
-  anyhook_apps_list: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  anyhook_inbox: { readOnlyHint: true },
-  anyhook_apps_create: { readOnlyHint: false, destructiveHint: false },
-  anyhook_connect: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-  anyhook_replay: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-  anyhook_undelivered: { readOnlyHint: true },
-  anyhook_replay_failed: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-  anyhook_events: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  anyhook_inspect: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  anyhook_simulate: { readOnlyHint: false, destructiveHint: false },
-  anyhook_code_get: { readOnlyHint: true },
-  anyhook_code_deploy: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-  anyhook_code_test: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-  anyhook_usage: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  anyhook_mock: { title: "Mock a webhook", readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_verify: { title: "Verify a webhook signature", readOnlyHint: true },
+  anyhook_providers: { title: "List supported providers and event types", readOnlyHint: true },
+  anyhook_quickstart: { title: "Create a free AnyHook endpoint (no account needed)", readOnlyHint: false, destructiveHint: false },
+  anyhook_apps_list: { title: "List your AnyHook apps", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  anyhook_inbox: { title: "Get this app's email inbox address", readOnlyHint: true },
+  anyhook_apps_create: { title: "Create a new AnyHook app", readOnlyHint: false, destructiveHint: true },
+  anyhook_destination_add: { title: "Forward an app's events to a URL", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  anyhook_connect: { title: "Connect Stripe or GitHub with one key", readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_replay: { title: "Replay an event", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  anyhook_undelivered: { title: "List undelivered events for an app", readOnlyHint: true },
+  anyhook_replay_failed: { title: "Bulk-replay an app's failed events", readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_events: { title: "List recent webhook events", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  anyhook_inspect: { title: "Inspect a specific event", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  anyhook_simulate: { title: "Simulate an incoming webhook (local only)", readOnlyHint: false, destructiveHint: false },
+  anyhook_code_get: { title: "Read an app's code handler", readOnlyHint: true },
+  anyhook_code_deploy: { title: "Deploy code that runs on an app's events", readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_code_test: { title: "Run an app's code on a stored event", readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  anyhook_usage: { title: "Show plan limits and usage", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 } as const;
 
 export type ServerOptions = {
@@ -112,24 +115,29 @@ function noKeyError() {
   };
 }
 
-const EVENTS_UI_URI = "ui://anyhook/events-v1.html";
+const EVENTS_UI_URI = "ui://anyhook/events-v3.html";
 
 /**
  * Inline card for anyhook_events (MCP Apps / ChatGPT). Rendered in an iframe by
  * the host; it reads the tool's structuredContent from the bridge and draws one
  * row per event. Text-only hosts never see this; the tool's JSON text still
  * carries everything.
+ *
+ * The handshake and the size report are not optional: claude.ai keeps the iframe
+ * hidden at height 0 until the card has introduced itself (seen 2026-11-08).
+ * A host caches this by URI, so a change here needs a new URI.
  */
 const EVENTS_UI_HTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
 <style>
-  :root { color-scheme: light dark; --bg:#ffffff; --fg:#09090b; --muted:#52525b; --line:#e4e4e7; --card:#fafafa; --ok:#059669; --warn:#b45309; --bad:#dc2626; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0a0a0a; --fg:#fafafa; --muted:#a1a1aa; --line:#1f1f22; --card:#111113; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; } }
+  :root { color-scheme: light dark; --fg:light-dark(#09090b,#fafafa); --muted:light-dark(#52525b,#a1a1aa); --line:light-dark(#e4e4e7,#2e2e32); --card:light-dark(#fafafa,#111113); --ok:light-dark(#059669,#34d399); --warn:light-dark(#b45309,#fbbf24); --bad:light-dark(#dc2626,#f87171); }
   * { box-sizing: border-box; }
-  body { margin:0; padding:10px 12px; font:14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--fg); }
+  html, body { background:transparent; }
+  body { margin:0; padding:10px 12px; font:14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color:var(--fg); }
   .head { display:flex; align-items:baseline; justify-content:space-between; margin:0 0 10px; }
   .title { font-weight:600; font-size:15px; }
   .count { color:var(--muted); font-size:12px; }
@@ -138,7 +146,7 @@ const EVENTS_UI_HTML = `<!doctype html>
   .meta { color:var(--muted); font-size:12px; margin-top:2px; font-family:ui-monospace, Menlo, monospace; }
   .side { text-align:right; flex:none; }
   .chip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px; border:1px solid var(--line); }
-  .chip.delivered { color:var(--ok); border-color:color-mix(in srgb, var(--ok) 35%, transparent); }
+  .chip.ok { color:var(--ok); border-color:color-mix(in srgb, var(--ok) 35%, transparent); }
   .chip.failed { color:var(--bad); border-color:color-mix(in srgb, var(--bad) 35%, transparent); }
   .chip.held { color:var(--warn); border-color:color-mix(in srgb, var(--warn) 35%, transparent); }
   .time { color:var(--muted); font-size:11px; margin-top:4px; font-family:ui-monospace, Menlo, monospace; }
@@ -150,6 +158,9 @@ const EVENTS_UI_HTML = `<!doctype html>
 <script>
 (function () {
   var root = document.getElementById('root');
+  function send(m) { window.parent.postMessage(Object.assign({ jsonrpc: '2.0' }, m), '*'); }
+  function reportSize() { send({ method: 'ui/notifications/size-changed', params: { height: Math.ceil(document.body.getBoundingClientRect().height) } }); }
+  function applyTheme(ctx) { if (ctx && ctx.theme) document.documentElement.style.colorScheme = ctx.theme; }
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function render(data) {
     var events = data && Array.isArray(data.events) ? data.events : [];
@@ -158,7 +169,7 @@ const EVENTS_UI_HTML = `<!doctype html>
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       var status = String(e.status == null ? '' : e.status);
-      var cls = status === 'delivered' ? 'delivered' : status === 'failed' ? 'failed' : status === 'quota_exceeded' ? 'held' : '';
+      var cls = status === 'success' ? 'ok' : (status === 'failed' || status === 'rejected') ? 'failed' : (status === 'retrying' || status === 'circuit_open' || status === 'quota_exceeded') ? 'held' : '';
       var when = String(e.receivedAt || '').replace('T', ' ').slice(0, 16);
       html += '<div class="row"><div style="min-width:0"><div class="type">' + esc(e.eventType) + '</div><div class="meta">' + esc(e.source) + ' · ' + esc(String(e.id || '').slice(0, 8)) + '…</div></div>' +
         '<div class="side"><span class="chip ' + cls + '">' + esc(status) + '</span><div class="time">' + esc(when) + '</div></div></div>';
@@ -169,8 +180,15 @@ const EVENTS_UI_HTML = `<!doctype html>
     if (event.source !== window.parent) return;
     var m = event.data;
     if (!m || m.jsonrpc !== '2.0') return;
+    if (m.id === 1 && m.result) {
+      applyTheme(m.result.hostContext);
+      send({ method: 'ui/notifications/initialized' });
+      new ResizeObserver(reportSize).observe(document.body);
+    }
+    if (m.method === 'ui/notifications/host-context-changed') applyTheme(m.params);
     if (m.method === 'ui/notifications/tool-result') render(m.params && m.params.structuredContent);
   }, { passive: true });
+  send({ id: 1, method: 'ui/initialize', params: { appInfo: { name: 'AnyHook events', version: '1.0.0' }, appCapabilities: {}, protocolVersion: '2026-01-26' } });
 })();
 </script>
 </body>
@@ -212,7 +230,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   const ICONS = [{ src: "https://anyhook.net/icon.png", mimeType: "image/png", sizes: ["512x512"] }];
 
   const server = new McpServer(
-    { name: "anyhook", version: "0.5.0", websiteUrl: "https://anyhook.net", icons: ICONS },
+    { name: "anyhook", version: "0.6.0", websiteUrl: "https://anyhook.net", icons: ICONS },
     { capabilities: { tools: {}, resources: {} } }
   );
 
@@ -226,7 +244,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
           uri: EVENTS_UI_URI,
           mimeType: "text/html;profile=mcp-app",
           text: EVENTS_UI_HTML,
-          _meta: { ui: { prefersBorder: true } },
+          _meta: { ui: { prefersBorder: false } },
         },
       ],
     })
@@ -237,7 +255,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     "anyhook_mock",
     {
       annotations: TOOL_ANNOTATIONS.anyhook_mock,
-      title: "Mock a webhook",
+      title: TOOL_ANNOTATIONS.anyhook_mock.title,
       description:
         "Generate a webhook request with a valid signature for Stripe, GitHub, or Slack. " +
         "If targetUrl is provided, the request is POSTed there and the response is returned.",
@@ -250,7 +268,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     "anyhook_verify",
     {
       annotations: TOOL_ANNOTATIONS.anyhook_verify,
-      title: "Verify a webhook signature",
+      title: TOOL_ANNOTATIONS.anyhook_verify.title,
       description:
         "Verify a webhook signature against a secret, for every source the AnyHook edge verifies, including " +
         "stripe, github, shopify, slack, line, discord, linear, vercel, paddle, hubspot, paypal and xero.",
@@ -263,7 +281,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     "anyhook_providers",
     {
       annotations: TOOL_ANNOTATIONS.anyhook_providers,
-      title: "List supported providers and event types",
+      title: TOOL_ANNOTATIONS.anyhook_providers.title,
       description:
         "List webhook providers AnyHook can mock, along with the event types available for each.",
       inputSchema: providersSchema,
@@ -278,7 +296,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     "anyhook_quickstart",
     {
       annotations: TOOL_ANNOTATIONS.anyhook_quickstart,
-      title: "Create a free AnyHook endpoint (no account needed)",
+      title: TOOL_ANNOTATIONS.anyhook_quickstart.title,
       description:
         "Zero-config bootstrap: creates a free ephemeral relay endpoint + API key with no signup. " +
         "Returns inbound_url (receives webhooks immediately), api_key, and claim_url. " +
@@ -310,10 +328,10 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_apps_list",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_apps_list,
-        title: "List your AnyHook apps",
+        title: TOOL_ANNOTATIONS.anyhook_apps_list.title,
         description:
           "List apps in your AnyHook account with inbound URLs, sources, and destination URLs. " +
-          "Check isActive: an inactive app's inbound URL answers setup handshakes but acknowledges " +
+          "With isActive false, an app's inbound URL answers setup handshakes but acknowledges " +
           "and discards event POSTs (202, reason app_inactive) instead of relaying them. " +
           "Destination signing secrets are redacted to has_signing_secret plus a 4-char hint; " +
           "a new secret in plaintext comes only from rotating it. An app whose slug was changed " +
@@ -330,7 +348,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_inbox",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_inbox,
-        title: "Get this app's email inbox address",
+        title: TOOL_ANNOTATIONS.anyhook_inbox.title,
         description:
           "Every AnyHook app is also an email inbox: mail sent to {user}.{app}@anyhook.net " +
           "becomes an event (type email.received) you can read with anyhook_events. " +
@@ -347,12 +365,11 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_apps_create",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_apps_create,
-        title: "Create a new AnyHook app",
+        title: TOOL_ANNOTATIONS.anyhook_apps_create.title,
         description:
           "Create a new app with a name, provider source, and (optionally) destinations. Returns the inbound URL. " +
           "The app is active immediately. Created WITHOUT destinations it still receives and LOGS every event " +
-          "(inspect-only), it just delivers nowhere until a destination is added " +
-          "(PATCH /api/v1/apps/{slug} with {\"destinations\": [...]}).",
+          "(inspect-only), it just delivers nowhere until a destination is added with anyhook_destination_add.",
         inputSchema: accountSchema(appsCreateSchema),
       },
       async (input) => {
@@ -362,17 +379,34 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     );
 
     if (!plugin) server.registerTool(
+      "anyhook_destination_add",
+      {
+        annotations: TOOL_ANNOTATIONS.anyhook_destination_add,
+        title: TOOL_ANNOTATIONS.anyhook_destination_add.title,
+        description:
+          "Add a destination to an existing app: new events are forwarded to this URL, with retries, within about a minute, " +
+          "and the app's other destinations stay as they are. Adding a URL the app already has changes nothing. " +
+          "Returns the destination's signing secret once, for verifying the AnyHook-Signature header on the receiving server.",
+        inputSchema: accountSchema(destinationAddSchema),
+      },
+      async (input) => {
+        if (!client) return noKeyError();
+        return handleDestinationAdd(input, client);
+      }
+    );
+
+    if (!plugin) server.registerTool(
       "anyhook_connect",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_connect,
-        title: "Connect Stripe or GitHub with one key",
+        title: TOOL_ANNOTATIONS.anyhook_connect.title,
         description:
           "Wire a provider to AnyHook in one call: give a Stripe or GitHub key and AnyHook registers the app's inbound URL " +
           "as a webhook at the provider, saves the signing secret it yields, and turns on signature verification at the edge. " +
           "The provider is read from the key; the key is used once and not stored. Without appSlug a new app is created " +
           "(and removed again if the provider refuses the key). Re-running replaces the registration instead of duplicating it. " +
-          "GitHub sends a signed ping immediately, so the first event appears within seconds. Add a destination afterwards " +
-          "(PATCH /api/v1/apps/{slug}) to forward events; until then they are received and logged.",
+          "GitHub sends a signed ping immediately, so the first event appears within seconds. Until the app has a destination " +
+          "(anyhook_destination_add), events are received and logged but not forwarded.",
         inputSchema: accountSchema(connectSchema),
       },
       async (input) => {
@@ -387,7 +421,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_replay",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_replay,
-        title: "Replay an event",
+        title: TOOL_ANNOTATIONS.anyhook_replay.title,
         description:
           "Re-send a stored event to its destinations. Replays sit outside the monthly event quota but within a daily replay limit per plan and the monthly compute allowance (anyhook_usage), and replaying an event that was held for quota bills it as a new event. The destination does run its handler again: a receiver that is not idempotent will process the event twice while debugging.",
         inputSchema: accountSchema(eventReplaySchema),
@@ -402,7 +436,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_undelivered",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_undelivered,
-        title: "List undelivered events for an app",
+        title: TOOL_ANNOTATIONS.anyhook_undelivered.title,
         description:
           "Show events for the given app that have not successfully reached any destination (failed or still retrying).",
         inputSchema: accountSchema(appUndeliveredSchema),
@@ -417,7 +451,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_replay_failed",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_replay_failed,
-        title: "Bulk-replay an app's failed events",
+        title: TOOL_ANNOTATIONS.anyhook_replay_failed.title,
         description:
           "Re-send an app's failed events after the destination is fixed, oldest first: by default those received " +
           "in the last 24 hours, at most 50 per call (since and limit change both; limit goes up to 100). Events " +
@@ -436,7 +470,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_code_get",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_code_get,
-        title: "Read an app's code handler",
+        title: TOOL_ANNOTATIONS.anyhook_code_get.title,
         description:
           "The code that runs on this app's events: its source, the names of its secrets (never the values), " +
           "whether events are reaching it, and runs used this month against the plan's limit.",
@@ -452,14 +486,14 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_code_deploy",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_code_deploy,
-        title: "Deploy code that runs on an app's events",
+        title: TOOL_ANNOTATIONS.anyhook_code_deploy.title,
         description:
           "Save a handler that runs on every event this app receives, in an isolated sandbox, with AnyHook's " +
           "retries and replay around it: no server of your own. Each run's console output and return value are " +
           "stored as that delivery's response (anyhook_inspect shows them). It can also run on a cron schedule. " +
           "Pro and Scale; runs are capped per month with no overage, retries, test runs and schedule firings each count, " +
           "and each run and package install is charged to the monthly compute allowance (anyhook_usage shows both). " +
-          "Test it with anyhook_code_test before real events arrive.",
+          "anyhook_code_test runs it on a stored event.",
         inputSchema: accountSchema(codeDeploySchema),
       },
       async (input) => {
@@ -472,7 +506,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_code_test",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_code_test,
-        title: "Run an app's code on a stored event",
+        title: TOOL_ANNOTATIONS.anyhook_code_test.title,
         description:
           "Run the saved handler now and return its logs, return value and duration: on a stored event " +
           "(the latest when event_id is omitted) or on a body you give. Counts as a run. Nothing is delivered, " +
@@ -489,12 +523,12 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_usage",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_usage,
-        title: "Show plan limits and usage",
+        title: TOOL_ANNOTATIONS.anyhook_usage.title,
         description:
           "What the plan allows and what this account has used of each: events this month (per delivery, large " +
           "events count per 64 KB), overage, the compute allowance and what used it (retries, replays, waiting on " +
           "slow destinations, code runs, builds, schedules), API calls today (each tool call that reads or changes the account counts one), code runs " +
-          "and package snapshots, with when each resets. Call it when something answers with a limit, before " +
+          "and package snapshots, with when each resets. It says how much is left when something answers with a limit, before " +
           "bulk work such as replay_failed, or when the user asks what they are using.",
         inputSchema: accountSchema(usageSchema),
       },
@@ -510,7 +544,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     "anyhook_events",
     {
       annotations: TOOL_ANNOTATIONS.anyhook_events,
-      title: "List recent webhook events",
+      title: TOOL_ANNOTATIONS.anyhook_events.title,
       description:
         "List webhook events, most recent first: id, app, type, status, attempt, destination " +
         "status code, latency, timestamp. Summaries only, no request headers or body; " +
@@ -538,11 +572,11 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
     "anyhook_inspect",
     {
       annotations: TOOL_ANNOTATIONS.anyhook_inspect,
-      title: "Inspect a specific event",
+      title: TOOL_ANNOTATIONS.anyhook_inspect.title,
       description:
         "Full detail for one event by id, including the inbound headers and body that " +
         "anyhook_events omits, plus the destination's response. Payloads can be large and " +
-        "often contain personal data, so fetch one at a time, only when the body is needed. " +
+        "often contain personal data, so it reads one event at a time, for when the body is needed. " +
         "Account or local store.",
       inputSchema: accountSchema(eventInspectSchema),
     },
@@ -561,7 +595,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       "anyhook_simulate",
       {
         annotations: TOOL_ANNOTATIONS.anyhook_simulate,
-        title: "Simulate an incoming webhook (local only)",
+        title: TOOL_ANNOTATIONS.anyhook_simulate.title,
         description:
           "Generate a mocked webhook AND insert it into the local memory store, so list/inspect flows can be exercised without a real provider. " +
           "Not available in remote mode, where a real inbound URL takes the place of the store.",

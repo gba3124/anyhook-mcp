@@ -113,6 +113,12 @@ export const appsCreateSchema = {
     .describe("Destination URLs that should receive forwarded events."),
 };
 
+export const destinationAddSchema = {
+  ...apiKeyParam,
+  appSlug: z.string().describe("The app whose events should be forwarded."),
+  url: z.string().url().describe("Public https URL that receives each event as a POST."),
+};
+
 export const connectSchema = {
   ...apiKeyParam,
   provider_key: z
@@ -176,8 +182,8 @@ export const codeDeploySchema = {
     .optional()
     .describe(
       "Whether events run the code. false saves it switched off, so it runs only through anyhook_code_test. " +
-        "Omit: a first deploy goes live and later deploys keep the current state. Deploy off while another system " +
-        "still handles the same events, or both will act on each one."
+        "Omit: a first deploy goes live and later deploys keep the current state. If another system still " +
+        "handles the same events while this is on, both act on each one."
     ),
 };
 
@@ -185,7 +191,7 @@ export const codeTestSchema = {
   ...apiKeyParam,
   appSlug: z.string(),
   event_id: z.string().optional().describe("Run on this stored event. Omit for the app's latest event."),
-  body: z.unknown().optional().describe("Run on this body instead of a stored event."),
+  body: z.record(z.string(), z.unknown()).optional().describe("Run on this JSON body instead of a stored event."),
 };
 
 export const usageSchema = { ...apiKeyParam };
@@ -501,6 +507,14 @@ export async function handleAppsCreate(
   try {
     const result = await client.createApp(input);
     return asTextContent(result);
+  } catch (err) {
+    return asApiError(err);
+  }
+}
+
+export async function handleDestinationAdd(input: { appSlug: string; url: string }, client: AnyHookClient) {
+  try {
+    return asTextContent(await client.addDestination(input.appSlug, input.url));
   } catch (err) {
     return asApiError(err);
   }

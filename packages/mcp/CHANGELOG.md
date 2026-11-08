@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.6.0]: 2026-11-08
+
+### Added
+- `anyhook_destination_add`: forward an existing app's events to a URL. Until now an agent could give a destination only while creating the app, and the tool text pointed at a REST call a hosted client cannot make.
+
+### Changed
+- `anyhook_apps_create` and `anyhook_connect` declare `destructiveHint: true`: both change where a provider's events go, so clients ask before running them.
+- Every tool carries its title in its annotations too.
+
+### Fixed
+- The events card reads the statuses the API reports: a delivered event is `success`, which the card left uncoloured. It also introduces itself to the host now, because claude.ai kept the card hidden until it did.
+
 ## [0.5.0]: 2026-11-04
 
 ### Added

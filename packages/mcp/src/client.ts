@@ -170,6 +170,14 @@ export class AnyHookClient {
     });
   }
 
+  /** Forward an existing app's events to one more URL; its other destinations stay as they are. */
+  async addDestination(appSlug: string, url: string): Promise<unknown> {
+    return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/destinations`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  }
+
   /**
    * Register an app's inbound URL with Stripe or GitHub using the provider's
    * own key, and save the signing secret it yields. The key rides this one

@@ -15,6 +15,7 @@ import {
   handleAppUndelivered,
   handleAppReplayFailed,
   handleConnect,
+  handleDestinationAdd,
   handleUsage,
   type ToolResult,
 } from "./tools";
@@ -170,6 +171,28 @@ describe("handleAppsList + handleAppsCreate", () => {
       destinations: [{ url: "https://example.com/hook" }],
     });
     expect(parse(result).inboundUrl).toBe("https://in.anyhook.net/u/new");
+  });
+});
+
+describe("handleDestinationAdd", () => {
+  it("adds the URL to the named app and passes the once-only secret through", async () => {
+    const client = fakeClient({
+      addDestination: vi.fn().mockResolvedValue({ added: true, signing_secret: "s" }),
+    });
+    const result = await handleDestinationAdd({ appSlug: "billing", url: "https://example.com/hook" }, client);
+    expect(client.addDestination).toHaveBeenCalledWith("billing", "https://example.com/hook");
+    expect(parse(result)).toEqual({ added: true, signing_secret: "s" });
+  });
+
+  it("keeps the API's fix when the plan refuses", async () => {
+    const client = fakeClient({
+      addDestination: vi.fn().mockRejectedValue(
+        new AnyHookApiError(403, "destination_limit", { error: "destination_limit", fix: "Remove a destination." }),
+      ),
+    });
+    const result = await handleDestinationAdd({ appSlug: "billing", url: "https://example.com/hook" }, client);
+    expect(result.isError).toBe(true);
+    expect(parse(result)).toEqual({ status: 403, error: "destination_limit", fix: "Remove a destination." });
   });
 });
 
