@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.6.1]: 2026-11-09
+
+### Changed
+- `anyhook_apps_create` no longer requires `source`. Naming a provider makes the edge refuse requests without its signature header, and the tool now says so.
+- `anyhook_undelivered` describes what it returns: events that failed or are held. An app with no destination has none, because its events are logged and not forwarded.
+
+### Fixed
+- The events card marks an event that was logged and not forwarded as `logged`, where it showed a green `success`.
+
 ## [0.6.0]: 2026-11-08
 
 ### Added

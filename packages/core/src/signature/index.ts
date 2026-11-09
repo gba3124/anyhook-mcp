@@ -469,6 +469,20 @@ async function verifyIntercom(payload: string, sigHeader: string, secret: string
   }
 }
 
+/** SendGrid signs in ASN.1 DER; WebCrypto verifies raw r||s. */
+function ecdsaDerToRaw(der: Uint8Array): Uint8Array {
+  const raw = new Uint8Array(64);
+  let at = 2; // past the SEQUENCE header
+  for (const end of [32, 64]) {
+    const length = der[at + 1];
+    // An INTEGER gains a leading zero when its top bit is set and loses any it had otherwise.
+    const value = der.subarray(at + 2, at + 2 + length).slice(-32);
+    raw.set(value, end - value.length);
+    at += 2 + length;
+  }
+  return raw;
+}
+
 async function verifySendGrid(payload: string, headers: Headers, publicKeySecret: string): Promise<boolean> {
   const sigHeader = headers.get("x-twilio-email-event-webhook-signature");
   const timestamp = headers.get("x-twilio-email-event-webhook-timestamp");
@@ -483,7 +497,8 @@ async function verifySendGrid(payload: string, headers: Headers, publicKeySecret
       false,
       ["verify"]
     );
-    const signature = Uint8Array.from(atob(sigHeader), (c) => c.charCodeAt(0));
+    const decoded = Uint8Array.from(atob(sigHeader), (c) => c.charCodeAt(0));
+    const signature = decoded.length === 64 ? decoded : ecdsaDerToRaw(decoded);
     const data = new TextEncoder().encode(`${timestamp}${payload}`);
     return crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },

@@ -115,7 +115,7 @@ function noKeyError() {
   };
 }
 
-const EVENTS_UI_URI = "ui://anyhook/events-v3.html";
+const EVENTS_UI_URI = "ui://anyhook/events-v4.html";
 
 /**
  * Inline card for anyhook_events (MCP Apps / ChatGPT). Rendered in an iframe by
@@ -169,10 +169,11 @@ const EVENTS_UI_HTML = `<!doctype html>
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       var status = String(e.status == null ? '' : e.status);
-      var cls = status === 'success' ? 'ok' : (status === 'failed' || status === 'rejected') ? 'failed' : (status === 'retrying' || status === 'circuit_open' || status === 'quota_exceeded') ? 'held' : '';
-      var when = String(e.receivedAt || '').replace('T', ' ').slice(0, 16);
+      var logged = status === 'success' && e.outboundStatus === 0;
+      var cls = logged ? '' : status === 'success' ? 'ok' : (status === 'failed' || status === 'rejected') ? 'failed' : (status === 'retrying' || status === 'circuit_open' || status === 'quota_exceeded') ? 'held' : '';
+      var when = String(e.receivedAt || e.createdAt || '').replace('T', ' ').slice(0, 16);
       html += '<div class="row"><div style="min-width:0"><div class="type">' + esc(e.eventType) + '</div><div class="meta">' + esc(e.source) + ' · ' + esc(String(e.id || '').slice(0, 8)) + '…</div></div>' +
-        '<div class="side"><span class="chip ' + cls + '">' + esc(status) + '</span><div class="time">' + esc(when) + '</div></div></div>';
+        '<div class="side"><span class="chip ' + cls + '">' + esc(logged ? 'logged' : status) + '</span><div class="time">' + esc(when) + '</div></div></div>';
     }
     root.innerHTML = html;
   }
@@ -230,7 +231,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   const ICONS = [{ src: "https://anyhook.net/icon.png", mimeType: "image/png", sizes: ["512x512"] }];
 
   const server = new McpServer(
-    { name: "anyhook", version: "0.6.0", websiteUrl: "https://anyhook.net", icons: ICONS },
+    { name: "anyhook", version: "0.6.1", websiteUrl: "https://anyhook.net", icons: ICONS },
     { capabilities: { tools: {}, resources: {} } }
   );
 
@@ -438,7 +439,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         annotations: TOOL_ANNOTATIONS.anyhook_undelivered,
         title: TOOL_ANNOTATIONS.anyhook_undelivered.title,
         description:
-          "Show events for the given app that have not successfully reached any destination (failed or still retrying).",
+          "Events for the given app that failed or are held (failed, circuit_open, quota_exceeded). An app with no destination has none: its events are logged, not forwarded.",
         inputSchema: accountSchema(appUndeliveredSchema),
       },
       async (input) => {

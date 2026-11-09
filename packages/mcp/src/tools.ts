@@ -98,7 +98,7 @@ export const quickstartSchema = {
   destination_url: z.string().url().optional()
     .describe("Optional forwarding destination for the new endpoint."),
   source: z.string().optional()
-    .describe("Optional provider hint (stripe, github, shopify, ...)."),
+    .describe("Optional provider name (stripe, github, shopify, ...). Leave it out to accept any sender: naming one makes the edge refuse (401) requests without that provider's signature header, curl tests included."),
 };
 
 export const appsCreateSchema = {
@@ -106,7 +106,8 @@ export const appsCreateSchema = {
   name: z.string().describe("Human-readable app name."),
   source: z
     .string()
-    .describe("Provider name (stripe, github, shopify, ...). Used for signature auto-detection."),
+    .optional()
+    .describe("Optional provider name (stripe, github, shopify, ...). Leave it out to accept any sender: naming one makes the edge refuse (401) requests without that provider's signature header, curl tests included."),
   destinations: z
     .array(z.object({ url: z.string().url() }))
     .optional()
@@ -501,7 +502,7 @@ export async function handleAppsList(_input: unknown, client: AnyHookClient) {
 }
 
 export async function handleAppsCreate(
-  input: { name: string; source: string; destinations?: { url: string }[] },
+  input: { name: string; source?: string; destinations?: { url: string }[] },
   client: AnyHookClient
 ) {
   try {

@@ -161,7 +161,7 @@ export class AnyHookClient {
 
   async createApp(input: {
     name: string;
-    source: string;
+    source?: string;
     destinations?: { url: string }[];
   }): Promise<RemoteApp> {
     return this.request(`/api/v1/apps`, {
