@@ -194,3 +194,15 @@ describe("the saved keyless account", () => {
     expect(readSaved(path, "https://anyhook.net")).toBeNull();
   });
 });
+
+describe("forward, a body carried in base64", () => {
+  it("posts the original bytes, not the text form", async () => {
+    let sent: unknown;
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      sent = init?.body;
+      return new Response("ok");
+    }) as typeof fetch;
+    await forward("http://localhost:3000/", { id: "e", headers: {}, body: `anyhook-base64-body:${btoa("\xff\xfe\x00")}` }, fetchImpl);
+    expect(Array.from(sent as Uint8Array)).toEqual([0xff, 0xfe, 0x00]);
+  });
+});

@@ -29,7 +29,7 @@ Connected. Waiting for events.
 ```
 
 - **The URL stays.** Restart the command and it is the same URL, so there is nothing to paste into the provider again.
-- **Signatures verify.** Your server gets the bytes the provider sent, so `stripe.webhooks.constructEvent` and friends work as they do in production.
+- **Signatures verify.** Your server gets the bytes the provider sent, so `stripe.webhooks.constructEvent` and friends work as they do in production. A retry or replay keeps the provider's original timestamp, so a check that refuses old timestamps, like Stripe's default, needs a longer tolerance locally.
 - **Nothing is lost when your laptop is shut.** Events are stored either way. A failed delivery is retried, and one that arrived while this was stopped can be replayed.
 
 `listen 3000/api/webhooks` sets the path. With `ANYHOOK_API_KEY` set it uses that account, and `--app <slug>` picks the app. Needs Node 22 or newer.
@@ -65,14 +65,14 @@ Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent c
 - `anyhook_destination_add`, forward an existing app's events to a URL
 - `anyhook_connect`, give a Stripe key or GitHub token: the webhook is registered at the provider and signature-checked from the first event (the key is not stored)
 - `anyhook_events`, list recent events, filter by app / status
-- `anyhook_inspect`, pull a single event's headers, body, signature status
+- `anyhook_inspect`, pull a single event's headers and body
 - `anyhook_replay`, re-send a stored event to its destinations (outside the monthly quota, within a daily replay limit and the compute allowance; an event held for quota counts as new)
-- `anyhook_undelivered`, list events that never reached a destination
+- `anyhook_undelivered`, list events that have not reached a destination: failed, held, still retrying, or logged while `listen` was stopped
 - `anyhook_usage`, the plan's limits and what the account has used of each, with when they reset
 - `anyhook_replay_failed`, bulk-replay an app's failed events, oldest first (the last 24 hours and 50 per call by default, up to 100), saying when more are waiting
 - `anyhook_mock`, generate a signed Stripe / GitHub / Slack payload for local handler testing
 - `anyhook_verify`, verify any incoming signature against your secret
-- `anyhook_providers`, list every webhook provider AnyHook supports
+- `anyhook_providers`, list the providers `anyhook_mock` can generate, with their event types
 
 The inbound URL an app gives you accepts webhook POSTs and also answers provider
 setup handshakes automatically: Meta's `GET` carrying `hub.mode=subscribe` gets its
@@ -205,7 +205,7 @@ Calls `anyhook_apps_create`, returns the inbound URL you paste into Replicate.
 
 > "Here's an inbound payload from Stripe that AnyHook is rejecting. Verify the signature manually with secret `whsec_xxx`."
 
-Calls `anyhook_verify` with the supplied headers + body + secret, returns `valid: false` plus the failure reason.
+Calls `anyhook_verify` with the supplied headers + body + secret and returns `valid`, with what to check when it is false.
 
 **Mock a webhook for local testing:**
 

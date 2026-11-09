@@ -36,7 +36,7 @@ export const mockSchema = {
 
 export const verifySchema = {
   provider: z.string()
-    .describe("Provider name (e.g. 'stripe', 'github', 'slack', 'generic')."),
+    .describe("Provider name (e.g. 'stripe', 'github', 'slack')."),
   headers: z.record(z.string(), z.string())
     .describe("Request headers as a flat object."),
   body: z.string()
@@ -237,12 +237,31 @@ function asErrorContent(problem: string | Record<string, unknown>): ToolResult {
   };
 }
 
+/** A hosted caller names the URL, so its answer is read only this far. The event log keeps as much. */
+const HOSTED_MOCK_ANSWER_CHARS = 10_000;
+
+async function readCapped(res: Response, maxChars: number): Promise<string> {
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+  let out = "";
+  while (reader && out.length < maxChars) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    out += decoder.decode(value, { stream: true });
+  }
+  await reader?.cancel().catch(() => {});
+  return out.slice(0, maxChars);
+}
+
 export async function handleMock(input: {
   provider: "stripe" | "github" | "slack";
   event: string;
   data?: Record<string, unknown>;
   secret?: string;
   targetUrl?: string;
+}, hosted?: {
+  client: AnyHookClient;
+  checkUrl?: (url: string) => { valid: boolean; reason?: string };
 }) {
   try {
     const req = await mock({
@@ -253,13 +272,29 @@ export async function handleMock(input: {
     });
 
     if (input.targetUrl) {
+      if (hosted) {
+        // This POST leaves from AnyHook's server, so it needs what a delivery
+        // needs: a real key, one metered call and a public URL. Reading the
+        // usage does the first two.
+        await hosted.client.usage();
+        const check = hosted.checkUrl?.(input.targetUrl);
+        if (!check?.valid) {
+          return asErrorContent({
+            error: "The hosted MCP server sends only to public https URLs.",
+            detail: check?.reason,
+            fix: "Leave out targetUrl to get the signed request back and send it yourself, or run npx -y anyhook-mcp, whose anyhook_mock can reach localhost.",
+          });
+        }
+      }
       const startedAt = Date.now();
       const res = await fetch(input.targetUrl, {
         method: req.method,
         headers: req.headers,
         body: req.body,
+        // Only the first URL was checked, and a slow answer must not hold the function.
+        ...(hosted ? { redirect: "manual" as const, signal: AbortSignal.timeout(10_000) } : {}),
       });
-      const responseBody = await res.text();
+      const responseBody = hosted ? await readCapped(res, HOSTED_MOCK_ANSWER_CHARS) : await res.text();
       const responseHeaders: Record<string, string> = {};
       res.headers.forEach((v, k) => {
         responseHeaders[k] = v;
@@ -281,7 +316,7 @@ export async function handleMock(input: {
       body: req.body,
     });
   } catch (err) {
-    return asErrorContent(err instanceof Error ? err.message : String(err));
+    return asApiError(err);
   }
 }
 
@@ -292,6 +327,14 @@ export async function handleVerify(input: {
   secret: string;
   requestUrl?: string;
 }) {
+  if (input.provider.trim().toLowerCase() === "generic") {
+    return asTextContent({
+      valid: null,
+      checked: false,
+      provider: input.provider,
+      detail: "Generic has no signature scheme, so nothing was checked.",
+    });
+  }
   try {
     const valid = await verifySignature(
       input.provider,
@@ -300,6 +343,13 @@ export async function handleVerify(input: {
       input.secret,
       input.requestUrl ?? "https://example.com/webhook"
     );
+    if (!valid) {
+      return asTextContent({
+        valid,
+        provider: input.provider,
+        detail: "The signature did not match, or AnyHook has no scheme under this provider name. Check the secret, that the body is the raw bytes, and the name.",
+      });
+    }
     return asTextContent({ valid, provider: input.provider });
   } catch (err) {
     return asErrorContent(err instanceof Error ? err.message : String(err));
@@ -625,7 +675,8 @@ export async function handleQuickstart(
         "config. IMPORTANT, before this session ends, tell your user: this " +
         "workspace self-deletes in 7 days (inbound URL, key, and events included) " +
         "unless claimed. Claiming is one free browser sign-in at claim_url and " +
-        "keeps everything permanently at the same URL. Offer them the link.",
+        "keeps the URL and the API key permanently; events stay for the plan's " +
+        "retention period. Offer them the link.",
     });
   } catch (err) {
     return asApiError(err);

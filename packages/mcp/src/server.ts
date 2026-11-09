@@ -98,6 +98,8 @@ export type ServerOptions = {
   client?: AnyHookClient;
   /** Hosted /mcp authenticates through the HTTP bearer; never request a key in tool arguments. */
   hosted?: boolean;
+  /** Hosted /mcp: may anyhook_mock POST to this URL from AnyHook's server? Without it, no URL may. */
+  checkTargetUrl?: (url: string) => { valid: boolean; reason?: string };
   /** Small public-reviewable catalogue; the full stdio and hosted surfaces stay compatible. */
   profile?: "full" | "plugin";
 };
@@ -231,7 +233,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
   const ICONS = [{ src: "https://anyhook.net/icon.png", mimeType: "image/png", sizes: ["512x512"] }];
 
   const server = new McpServer(
-    { name: "anyhook", version: "0.6.1", websiteUrl: "https://anyhook.net", icons: ICONS },
+    { name: "anyhook", version: "0.6.2", websiteUrl: "https://anyhook.net", icons: ICONS },
     { capabilities: { tools: {}, resources: {} } }
   );
 
@@ -259,10 +261,15 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
       title: TOOL_ANNOTATIONS.anyhook_mock.title,
       description:
         "Generate a webhook request with a valid signature for Stripe, GitHub, or Slack. " +
-        "If targetUrl is provided, the request is POSTed there and the response is returned.",
+        "If targetUrl is provided, the request is POSTed there and the response is returned." +
+        (opts.hosted ? " This hosted server reaches public https URLs only; to reach localhost, run npx -y anyhook-mcp." : ""),
       inputSchema: mockSchema,
     },
-    async (input) => handleMock(input)
+    async (input) => {
+      if (!opts.hosted) return handleMock(input);
+      if (!client) return noKeyError();
+      return handleMock(input, { client, checkUrl: opts.checkTargetUrl });
+    }
   );
 
   if (!plugin) server.registerTool(
@@ -439,7 +446,7 @@ export function createAnyHookMcpServer(opts: ServerOptions = {}): McpServer {
         annotations: TOOL_ANNOTATIONS.anyhook_undelivered,
         title: TOOL_ANNOTATIONS.anyhook_undelivered.title,
         description:
-          "Events for the given app that failed or are held (failed, circuit_open, quota_exceeded). An app with no destination has none: its events are logged, not forwarded.",
+          "Events for the given app that have not reached a destination: failed, held (circuit_open, quota_exceeded), still retrying, or logged while anyhook-mcp listen was stopped. An app with no destination has none: its events are logged, not forwarded.",
         inputSchema: accountSchema(appUndeliveredSchema),
       },
       async (input) => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryStore } from "@anyhook/core/store";
 import {
   handleMock,
@@ -8,10 +8,47 @@ import {
   handleProviders,
   handleEventsSimulate,
 } from "./tools";
+import { AnyHookApiError, type AnyHookClient } from "./client";
 
 function parseText(result: { content: Array<{ text: string }>; isError?: boolean }) {
   return JSON.parse(result.content[0].text);
 }
+
+describe("handleMock on the hosted server", () => {
+  const input = { provider: "stripe" as const, event: "payment_intent.succeeded", targetUrl: "https://example.test/hook" };
+  const account = { usage: async () => ({}) } as unknown as AnyHookClient;
+  const stubFetch = () => {
+    const sent = vi.fn(async () => new Response("x".repeat(20_000)));
+    vi.stubGlobal("fetch", sent);
+    return sent;
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sends nothing for a key the API refuses", async () => {
+    const sent = stubFetch();
+    const refused = { usage: async () => { throw new AnyHookApiError(401, "Invalid API key", { error: "Invalid API key" }); } } as unknown as AnyHookClient;
+    const result = await handleMock(input, { client: refused, checkUrl: () => ({ valid: true }) });
+    expect(result.isError).toBe(true);
+    expect(parseText(result)).toMatchObject({ status: 401, error: "Invalid API key" });
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing to a URL the check refuses, or when there is no check", async () => {
+    const sent = stubFetch();
+    const refused = await handleMock(input, { client: account, checkUrl: () => ({ valid: false, reason: "Blocked hostname: localhost" }) });
+    expect(parseText(refused)).toMatchObject({ detail: "Blocked hostname: localhost" });
+    expect(parseText(refused).fix).toContain("npx -y anyhook-mcp");
+    expect((await handleMock(input, { client: account })).isError).toBe(true);
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("leaves a redirect alone and reads only part of a long answer", async () => {
+    const sent = stubFetch();
+    const result = await handleMock(input, { client: account, checkUrl: () => ({ valid: true }) });
+    expect((sent.mock.calls[0] as unknown[])[1]).toMatchObject({ redirect: "manual" });
+    expect(parseText(result).response.body).toHaveLength(10_000);
+  });
+});
 
 describe("handleMock", () => {
   it("returns a Stripe request with valid signature", async () => {
@@ -104,5 +141,20 @@ describe("handleEventsSimulate + handleEventsList + handleEventInspect", () => {
     const store = createMemoryStore();
     const result = await handleEventInspect({ id: "nonexistent" }, store);
     expect(result.isError).toBe(true);
+  });
+});
+
+describe("handleVerify without a scheme to check", () => {
+  const verify = (provider: string) => handleVerify({ provider, headers: {}, body: "{}", secret: "x" });
+  const parsed = (r: Awaited<ReturnType<typeof verify>>) => JSON.parse((r.content[0] as { text: string }).text);
+
+  it("says generic was not checked instead of answering valid", async () => {
+    expect(parsed(await verify("generic"))).toMatchObject({ valid: null, checked: false });
+  });
+
+  it("says what to check when a name has no scheme", async () => {
+    const result = parsed(await verify("nonsense"));
+    expect(result.valid).toBe(false);
+    expect(result.detail).toContain("provider name");
   });
 });

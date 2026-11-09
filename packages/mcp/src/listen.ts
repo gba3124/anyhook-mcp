@@ -73,13 +73,21 @@ export type Answer = { id: string; status: number; headers?: Record<string, stri
 
 const NOT_ANSWERED = /^(content-encoding|content-length|transfer-encoding|connection|keep-alive)$/i;
 
+/** A body that is not valid UTF-8 travels as this prefix plus base64 (src/lib/event-body.ts in the service). */
+const BASE64_BODY_PREFIX = "anyhook-base64-body:";
+
+function wireBody(body: string) {
+  if (!body.startsWith(BASE64_BODY_PREFIX)) return body;
+  return Uint8Array.from(atob(body.slice(BASE64_BODY_PREFIX.length)), (c) => c.charCodeAt(0));
+}
+
 /** Post one event to the local server. Never throws: no answer is an answer too, and the forwarder retries it. */
 export async function forward(target: string, frame: EventFrame, fetchImpl: typeof fetch = fetch): Promise<Answer> {
   try {
     const res = await fetchImpl(target, {
       method: "POST",
       headers: localHeaders(frame.headers),
-      body: frame.body,
+      body: wireBody(frame.body),
       redirect: "manual",
       signal: AbortSignal.timeout(LOCAL_TIMEOUT_MS),
     });
@@ -210,12 +218,14 @@ async function open(
     try {
       return { client, slug, session: await client.listen(slug) };
     } catch (err) {
-      if (statusOf(err) === 404 && !appFlag) {
+      const gone = statusOf(err) === 404 && !appFlag;
+      if (gone && (await client.listApps()).apps.length > 0) {
         const moved = await chooseApp(client);
         writeSaved(path, { ...saved, appSlug: moved });
         return { client, slug: moved, session: await client.listen(moved) };
       }
-      if (statusOf(err) !== 401) throw err;
+      // An account whose last app was deleted falls through to a new temporary URL.
+      if (!gone && statusOf(err) !== 401) throw err;
       print("Your temporary URL has expired, so this is a new one.\n");
     }
   }

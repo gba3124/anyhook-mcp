@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.6.2]: 2026-11-09
+
+### Changed
+- On the hosted server, `anyhook_mock` with `targetUrl` needs a valid key and counts as one API call. It sends only to public https URLs, does not follow redirects, waits 10 seconds at most and returns the first 10,000 characters of the answer. A URL on your own machine gets a refusal that says how to reach it. `npx -y anyhook-mcp` still reaches localhost.
+- `anyhook_undelivered` says what it now returns: failed and held events, events still retrying, and events logged while `listen` was stopped.
+- `anyhook_verify` answers `valid: null` and `checked: false` for `generic`, which has no signature to check, and says why when a signature does not match.
+- The quickstart's note to agents says the URL and the key are permanent, and that events stay for the plan's retention period.
+
+### Fixed
+- `listen` posts the original bytes when a body is not valid UTF-8. It posted the base64 form that AnyHook stores.
+- `listen` opens a new temporary URL when the saved account has no app left. It stopped with an error.
+
 ## [0.6.1]: 2026-11-09
 
 ### Changed
