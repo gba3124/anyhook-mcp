@@ -1,7 +1,7 @@
 /**
  * In-memory event store, used by CLI (default) and MCP for ephemeral inspection.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMemoryStore } from "./index";
 import type { NewEventInput } from "./index";
 
@@ -60,6 +60,25 @@ describe("memory store, list", () => {
 
     const { events } = await store.list({ limit: 2 });
     expect(events.length).toBe(2);
+  });
+
+  it("pages equal timestamps within an inclusive time window without repeating IDs", async () => {
+    const store = createMemoryStore();
+    const instant = new Date("2026-01-01T01:00:00Z");
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(instant.getTime() - 1);
+      await store.insert(sampleEvent());
+      vi.setSystemTime(instant);
+      const wanted = await Promise.all(Array.from({ length: 3 }, () => store.insert(sampleEvent())));
+      const first = await store.list({ since: instant, limit: 2 });
+      const last = await store.list({ since: instant, limit: 2, cursor: first.nextCursor! });
+      expect([...first.events, ...last.events].map((event) => event.id).sort()).toEqual(wanted.map((event) => event.id).sort());
+      expect(last.nextCursor).toBeNull();
+      await expect(store.list({ cursor: "gone" })).rejects.toThrow("cursor");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("filters by source", async () => {

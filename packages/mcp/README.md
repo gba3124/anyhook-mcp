@@ -6,6 +6,14 @@ Apache 2.0 · `npm i -g anyhook-mcp`
 
 ---
 
+## Receive webhooks between chats
+
+1. Connect to `https://anyhook.net/mcp` and sign in. In the full AnyHook connection, ask **“Create a webhook inbox called order-updates and give me its URL.”** Give the returned inbound URL to the service sending webhooks.
+2. Close the chat. An active hosted inbox keeps receiving. Later, reconnect the same AnyHook account and ask **“What arrived in order-updates in the last 24 hours, and which deliveries need attention?”**
+3. Clients with an MCP prompt menu also offer **Catch up on webhook deliveries** (`webhook-inbox-catch-up`). Enter an app slug to narrow the recap. Stored-only events, confirmed forwarding and failures are reported separately. Ask for an event by ID when you want its payload.
+
+On a team connection, the recap covers the selected workspace and requires event access. The Plugin connection reads existing inboxes. If you started with a seven-day trial over stdio, reconnect with the original `ANYHOOK_API_KEY` in your client's secret settings. Claim the endpoint before the trial expires to keep the URL.
+
 ## Forward webhooks to localhost
 
 A public webhook URL that forwards to your machine, with no account:
@@ -63,7 +71,7 @@ Drop this MCP server into Claude Desktop / Cursor / Claude Code and your agent c
 - `anyhook_apps_list`, see every app in your AnyHook account with its inbound URL
 - `anyhook_apps_create`, spin up a new app from a prompt
 - `anyhook_destination_add`, forward an existing app's events to a URL
-- `anyhook_connect`, give a Stripe key or GitHub token: the webhook is registered at the provider and signature-checked from the first event (the key is not stored)
+- `anyhook_connect`, send the user to the app's page, where they paste a Stripe key or GitHub token once: the webhook is registered at the provider and signature-checked from the first event (the key never passes through the chat and is not stored)
 - `anyhook_events`, list recent events, filter by app / status
 - `anyhook_inspect`, pull a single event's headers and body
 - `anyhook_replay`, re-send a stored event to its destinations (outside the monthly quota, within a daily replay limit and the compute allowance; an event held for quota counts as new)
@@ -220,7 +228,7 @@ Calls `anyhook_mock` with `targetUrl` set; returns the request that was sent + y
 | Var | Required | Default | Purpose |
 |---|---|---|---|
 | `ANYHOOK_API_KEY` | for remote mode | - | `ahk_live_*` from <https://anyhook.net/dashboard/settings> |
-| `ANYHOOK_API_BASE` | no | `https://anyhook.net` | Override for self-hosted AnyHook deployments |
+| `ANYHOOK_API_BASE` | no | `https://anyhook.net` | Override the API base URL |
 
 ---
 

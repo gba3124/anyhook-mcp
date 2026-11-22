@@ -6,6 +6,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.7.0]: 2026-11-22
+
+### Added
+- `anyhook_events` takes `since` and `cursor`. An agent reads what arrived after a saved time and pages with `nextCursor` until it is null, so the next chat can catch up on a hosted inbox that kept receiving while the chat was closed.
+- The prompt `webhook-inbox-catch-up` (Catch up on webhook deliveries) asks for a read-only recap of the last 24 hours, for one app or for all of them.
+- The server's instructions tell the client that a hosted inbox keeps receiving between chats, and what to ask after reconnecting.
+
+### Changed
+- `anyhook_connect` takes no key. It answers with `connect_url`, the app's dashboard page, where the user pastes a Stripe restricted key or a GitHub token; without `appSlug` it creates the app first. The key never passes through the conversation.
+- `anyhook_code_deploy` takes no `secrets`. The user sets them on the app's dashboard page, under Code, and the code reads them as `env.NAME`.
+- `anyhook_apps_create` and `anyhook_destination_add` no longer return a destination's signing secret. Their note says where the user gets it: Rotate on the destination, in the dashboard.
+- On the hosted server, an AI client signed in with OAuth cannot set, rotate or receive a signing secret, connect Stripe or GitHub, or set code secrets: each answers 403 `dashboard_only` with the page to use instead.
+- `anyhook_quickstart`, `anyhook_apps_create` and `anyhook_events` describe a hosted webhook inbox that keeps receiving between sessions. The quickstart's note tells the agent to keep the key in the MCP client's secret configuration and out of chat replies, and to give the owner `claim_url` privately.
+- Account tools ignore the `apiKey` argument. Over stdio the key comes from `ANYHOOK_API_KEY`, and the hosted server reads it from sign-in or the Authorization header.
+- The events card labels each event `stored only`, `forwarded` or `unconfirmed`, where it showed `logged` or the raw status.
+- `anyhook_inbox` and `anyhook_quickstart` mark a refusal as an error result.
+- `listen` says when the saved credentials can no longer open the inbox, where it said the temporary URL had expired, and tells the owner of a claimed URL to reconnect with `ANYHOOK_API_KEY`.
+- Requests from `anyhook_events`, `anyhook_inspect` and `anyhook_apps_create` carry an `X-AnyHook-Tool` header that names the tool, and the requests `anyhook_mock` sends carry `x-anyhook-test-event: 1`.
+
 ## [0.6.2]: 2026-11-09
 
 ### Changed

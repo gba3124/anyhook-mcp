@@ -127,13 +127,17 @@ export class AnyHookClient {
     appSlug?: string;
     status?: string;
     limit?: number;
-  }): Promise<{ events: RemoteEvent[]; nextCursor?: string }> {
+    since?: string;
+    cursor?: string;
+  }): Promise<{ events: RemoteEvent[]; nextCursor?: string | null }> {
     const qs = new URLSearchParams();
     if (params.appSlug) qs.set("app_slug", params.appSlug);
     if (params.status) qs.set("status", params.status);
     if (params.limit) qs.set("limit", String(params.limit));
+    if (params.since) qs.set("since", params.since);
+    if (params.cursor) qs.set("cursor", params.cursor);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return this.request(`/api/v1/events${suffix}`);
+    return this.request(`/api/v1/events${suffix}`, { headers: { "X-AnyHook-Tool": "anyhook_events" } });
   }
 
   /**
@@ -141,7 +145,7 @@ export class AnyHookClient {
    * read — previously inspect had to scan 200 listed events to find one.
    */
   async getEvent(id: string): Promise<{ event: RemoteEvent & Record<string, unknown> }> {
-    return this.request(`/api/v1/events/${encodeURIComponent(id)}`);
+    return this.request(`/api/v1/events/${encodeURIComponent(id)}`, { headers: { "X-AnyHook-Tool": "anyhook_inspect" } });
   }
 
   async replayEvent(id: string): Promise<unknown> {
@@ -166,6 +170,7 @@ export class AnyHookClient {
   }): Promise<RemoteApp> {
     return this.request(`/api/v1/apps`, {
       method: "POST",
+      headers: { "X-AnyHook-Tool": "anyhook_apps_create" },
       body: JSON.stringify(input),
     });
   }
@@ -178,10 +183,17 @@ export class AnyHookClient {
     });
   }
 
+  /** A page of the AnyHook dashboard, on the same host as the API. */
+  dashboardUrl(path: string): string {
+    return `${this.cfg.apiBase}${path}`;
+  }
+
   /**
    * Register an app's inbound URL with Stripe or GitHub using the provider's
    * own key, and save the signing secret it yields. The key rides this one
    * request; the API does not store it. Without `app`, a new app is created.
+   * No tool calls it: the key goes into the dashboard, never through an agent
+   * (anyhook_connect hands the user that page). An OAuth token gets 403.
    */
   async connect(input: { key: string; app?: string; target?: string }): Promise<unknown> {
     return this.request(`/api/v1/connect`, {
@@ -216,7 +228,10 @@ export class AnyHookClient {
     return this.request(`/api/v1/apps/${encodeURIComponent(appSlug)}/code`);
   }
 
-  /** Save the handler; secrets merge (null removes one), schedule is a cron or null. The app starts sending its events to it. */
+  /**
+   * Save the handler; secrets merge (null removes one), schedule is a cron or null. The app starts sending its events to it.
+   * anyhook_code_deploy sends no secrets (the user sets them in the dashboard), and an OAuth token sending any gets 403.
+   */
   async putCode(
     appSlug: string,
     input: { code: string; secrets?: Record<string, string | null>; schedule?: string | null; enabled?: boolean }

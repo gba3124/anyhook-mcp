@@ -22,7 +22,7 @@ import {
 import { AnyHookApiError, type AnyHookClient } from "./client";
 
 function fakeClient(overrides: Partial<AnyHookClient>): AnyHookClient {
-  return overrides as unknown as AnyHookClient;
+  return { dashboardUrl: (path: string) => `https://anyhook.net${path}`, ...overrides } as unknown as AnyHookClient;
 }
 
 function parse(result: ToolResult) {
@@ -135,10 +135,10 @@ describe("handleInbox", () => {
     expect(data.available).toEqual(["quickstart", "stripe-prod"]);
   });
 
-  it("no apps → points at quickstart", async () => {
+  it("no apps → creates the first inbox on the already connected account", async () => {
     const client = fakeClient({ listApps: vi.fn().mockResolvedValue({ apps: [] }) });
     const data = parse(await handleInbox({}, client));
-    expect(data.fix).toContain("anyhook_quickstart");
+    expect(data.fix).toContain("anyhook_apps_create");
   });
 
   it("server without inbox support → says so instead of inventing an address", async () => {
@@ -175,13 +175,24 @@ describe("handleAppsList + handleAppsCreate", () => {
 });
 
 describe("handleDestinationAdd", () => {
-  it("adds the URL to the named app and passes the once-only secret through", async () => {
+  it("adds the URL to the named app and keeps the once-only secret out of the agent's hands", async () => {
+    const secret = ["whsec", "d".repeat(32)].join("_");
     const client = fakeClient({
-      addDestination: vi.fn().mockResolvedValue({ added: true, signing_secret: "s" }),
+      addDestination: vi.fn().mockResolvedValue({ app: { slug: "billing" }, added: true, signing_secret: secret, note: "shown here" }),
     });
     const result = await handleDestinationAdd({ appSlug: "billing", url: "https://example.com/hook" }, client);
     expect(client.addDestination).toHaveBeenCalledWith("billing", "https://example.com/hook");
-    expect(parse(result)).toEqual({ added: true, signing_secret: "s" });
+    expect(result.content[0].text).not.toContain(secret);
+    expect(parse(result)).toEqual({
+      app: { slug: "billing" }, added: true,
+      note: expect.stringContaining("The user gets it on https://anyhook.net/dashboard/apps/billing"),
+    });
+  });
+
+  it("passes an answer with no secret in it through unchanged (an OAuth caller's)", async () => {
+    const answer = { app: { slug: "billing" }, added: true, note: "The signing secret is not shown to an AI client." };
+    const client = fakeClient({ addDestination: vi.fn().mockResolvedValue(answer) });
+    expect(parse(await handleDestinationAdd({ appSlug: "billing", url: "https://example.com/hook" }, client))).toEqual(answer);
   });
 
   it("keeps the API's fix when the plan refuses", async () => {
@@ -228,27 +239,35 @@ describe("handleAppUndelivered + handleAppReplayFailed", () => {
 });
 
 describe("handleConnect", () => {
-  const key = ["rk", "live", "k".repeat(24)].join("_");
-
-  it("sends the provider key as `key` with the app and target, and returns the result", async () => {
-    const client = fakeClient({
-      connect: vi.fn().mockResolvedValue({ connected: true, provider: "stripe", inboundUrl: "https://in.anyhook.net/acme/stripe" }),
+  it("hands over the app's page and never asks for the key", async () => {
+    const client = fakeClient({ createApp: vi.fn(), connect: vi.fn() });
+    const result = await handleConnect({ appSlug: "payments" }, client);
+    expect(client.createApp).not.toHaveBeenCalled();
+    expect(client.connect).not.toHaveBeenCalled();
+    expect(parse(result)).toEqual({
+      connect_url: "https://anyhook.net/dashboard/apps/payments#connect",
+      next: expect.stringContaining("never through this conversation"),
     });
-    const result = await handleConnect({ provider_key: key, appSlug: "payments" }, client);
-    expect(client.connect).toHaveBeenCalledWith({ key, app: "payments", target: undefined });
-    expect(parse(result)).toMatchObject({ connected: true, provider: "stripe" });
   });
 
-  it("passes the route's error, detail and fix through so the agent can act on them", async () => {
+  it("creates an app for the provider first, its secret left out", async () => {
+    const secret = ["whsec", "c".repeat(32)].join("_");
     const client = fakeClient({
-      connect: vi.fn().mockRejectedValue(
-        new AnyHookApiError(403, "missing_permission", { error: "missing_permission", detail: "The key cannot manage webhook endpoints.", fix: "Webhook Endpoints = Write" })
-      ),
+      createApp: vi.fn().mockResolvedValue({ app: { slug: "github", destinations: [{ url: "https://x.test", signing_secret: secret }] } }),
     });
-    const result = await handleConnect({ provider_key: key }, client);
+    const result = await handleConnect({ provider: "github" }, client);
+    expect(client.createApp).toHaveBeenCalledWith({ name: "GitHub" });
+    expect(result.content[0].text).not.toContain(secret);
+    expect(parse(result)).toMatchObject({ connect_url: "https://anyhook.net/dashboard/apps/github#connect" });
+  });
+
+  it("passes a refusal through with its fix", async () => {
+    const client = fakeClient({
+      createApp: vi.fn().mockRejectedValue(new AnyHookApiError(403, "app_limit_reached", { error: "app_limit_reached", fix: "Reuse one." })),
+    });
+    const result = await handleConnect({}, client);
     expect(result.isError).toBe(true);
-    expect(parse(result)).toMatchObject({ status: 403, error: "missing_permission", fix: "Webhook Endpoints = Write" });
-    expect(result.content[0].text).not.toContain(key);
+    expect(parse(result)).toEqual({ status: 403, error: "app_limit_reached", fix: "Reuse one." });
   });
 });
 

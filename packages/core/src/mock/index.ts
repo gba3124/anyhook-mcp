@@ -119,6 +119,7 @@ async function signStripe(body: string, secret: string, timestamp: Date): Promis
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "x-anyhook-test-event": "1",
       "user-agent": "Stripe/1.0 (+https://stripe.com/docs/webhooks)",
       "stripe-signature": `t=${ts},v1=${hex}`,
     },
@@ -134,6 +135,7 @@ async function signGithub(body: string, secret: string, event: string): Promise<
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "x-anyhook-test-event": "1",
       "user-agent": "GitHub-Hookshot/mock",
       "x-github-event": resourceName,
       "x-hub-signature-256": `sha256=${hex}`,
@@ -150,6 +152,7 @@ async function signSlack(body: string, secret: string, timestamp: Date): Promise
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "x-anyhook-test-event": "1",
       "user-agent": "Slackbot 1.0 (+https://api.slack.com/robots)",
       "x-slack-request-timestamp": ts,
       "x-slack-signature": `v0=${hex}`,

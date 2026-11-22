@@ -17,7 +17,8 @@
       "postcss": ">=8.5.10",
       "body-parser": ">=2.4.0",
       "proxy-addr": ">=2.0.8 <3",
-      "source-map-js": ">=1.2.2 <2"
+      "source-map-js": ">=1.2.2 <2",
+      "vite": "8.3.4"
     }
   }
 }

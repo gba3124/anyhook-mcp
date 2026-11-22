@@ -50,7 +50,7 @@ export const verifySchema = {
 export const eventInspectSchema = {
   id: z.string().describe("Event ID returned by anyhook_events."),
   api_key: z.string().optional()
-    .describe("API key (ahk_live_...) from anyhook_quickstart. Only needed over HTTP when no Authorization header is set; ignored over stdio."),
+    .describe("Legacy field, ignored. Connect with ANYHOOK_API_KEY in the stdio client configuration."),
 };
 
 export const providersSchema = {};
@@ -64,12 +64,10 @@ export const eventsSimulateSchema = {
 
 // Remote-mode schemas
 
-// Over streamable HTTP the transport is stateless, so a keyless session can't
-// keep the key quickstart minted. Account tools accept it per call instead;
-// the HTTP route consumes this argument and strips it before dispatch.
+// Kept for stdio compatibility. Hosted MCP only advertises transport authentication.
 export const apiKeyParam = {
   api_key: z.string().optional()
-    .describe("API key (ahk_live_...) from anyhook_quickstart. Only needed over HTTP when no Authorization header is set; ignored over stdio."),
+    .describe("Legacy field, ignored. Connect with ANYHOOK_API_KEY in the stdio client configuration."),
 };
 
 export const eventsListUnifiedSchema = {
@@ -79,6 +77,8 @@ export const eventsListUnifiedSchema = {
   status: z.string().optional()
     .describe("Filter by status. Account mode: queued|success|retrying|failed|rejected|circuit_open|quota_exceeded. Local mode: received|forwarded|failed|retrying."),
   limit: z.number().int().min(1).max(200).optional(),
+  since: z.iso.datetime().max(27).optional().describe("Include events received at or after this UTC timestamp. When resuming, overlap the last read time and deduplicate by event id."),
+  cursor: z.string().min(1).max(128).optional().describe("For the next page of older events, pass nextCursor from the previous page and keep the same filters."),
 };
 
 export const eventReplaySchema = {
@@ -122,18 +122,11 @@ export const destinationAddSchema = {
 
 export const connectSchema = {
   ...apiKeyParam,
-  provider_key: z
-    .string()
-    .describe(
-      "A Stripe secret or restricted key (sk_… / rk_…) or a GitHub token (github_pat_… / ghp_…). " +
-        "The provider is read from the key. Used once to register the webhook at the provider; AnyHook does not store it. " +
-        "Least privilege: a Stripe restricted key with Webhook Endpoints = Write, or a fine-grained GitHub token with Webhooks = Read and write."
-    ),
-  appSlug: z.string().optional().describe("Connect this existing app. Omit to create a new app for the provider."),
-  target: z
-    .string()
+  provider: z
+    .enum(["stripe", "github"])
     .optional()
-    .describe('GitHub only: "owner/repo", or an organization name for an org-wide hook. Optional when the token administers exactly one repository.'),
+    .describe("The provider to connect. Names the new app when appSlug is left out; Stripe if omitted."),
+  appSlug: z.string().optional().describe("Connect this existing app. Omit to create a new app for the provider."),
 };
 
 export const appUndeliveredSchema = {
@@ -165,10 +158,6 @@ export const codeDeploySchema = {
         "Throwing fails the delivery, which AnyHook retries. Templates for common actions (Slack, email, Google Sheets, " +
         "Notion, Claude and more): https://anyhook.net/code-templates.md"
     ),
-  secrets: z
-    .record(z.string(), z.string().nullable())
-    .optional()
-    .describe("Environment variables for the code, read as env.NAME or process.env.NAME. Merged into the saved ones; null removes a name."),
   schedule: z
     .string()
     .nullable()
@@ -357,13 +346,20 @@ export async function handleVerify(input: {
 }
 
 export async function handleEventsList(
-  input: { status?: string; source?: string; limit?: number },
+  input: { status?: string; source?: string; limit?: number; since?: string; cursor?: string },
   store: EventStore
 ) {
+  const since = input.since ? new Date(input.since) : undefined;
+  // The local store's clock has millisecond resolution. Round a finer inclusive
+  // lower bound up, so a local event from just before it cannot reappear.
+  const fraction = input.since?.match(/\.(\d+)Z$/)?.[1] ?? "";
+  if (since && Number(fraction.slice(3)) > 0) since.setTime(since.getTime() + 1);
   const { events, nextCursor } = await store.list({
     status: input.status as never,
     source: input.source,
     limit: input.limit,
+    since,
+    cursor: input.cursor,
   });
   return asTextContent({
     events: events.map((e) => ({
@@ -458,7 +454,7 @@ function asApiError(err: unknown) {
 }
 
 export async function handleEventsListRemote(
-  input: { appSlug?: string; status?: string; limit?: number },
+  input: { appSlug?: string; status?: string; limit?: number; since?: string; cursor?: string },
   client: AnyHookClient
 ) {
   try {
@@ -507,15 +503,15 @@ export async function handleInbox(input: { app?: string }, client: AnyHookClient
   try {
     const { apps } = await client.listApps();
     if (!apps.length) {
-      return asTextContent({
+      return asErrorContent({
         error: "No apps in this account.",
-        fix: "Run anyhook_quickstart to create one, it returns an inbox_address directly.",
+        fix: "Use anyhook_apps_create with a name to create an inbox in this connected account, then call anyhook_inbox again.",
       });
     }
 
     const app = input.app ? apps.find((a) => a.slug === input.app) : apps[0];
     if (!app) {
-      return asTextContent({
+      return asErrorContent({
         error: `No app with slug '${input.app}'.`,
         available: apps.map((a) => a.slug),
       });
@@ -523,7 +519,7 @@ export async function handleInbox(input: { app?: string }, client: AnyHookClient
     // Older API deploys don't return addresses; surface that rather than fabricating
     // one here, the address format is owned by the server, not this client.
     if (!app.inboxAddress) {
-      return asTextContent({
+      return asErrorContent({
         error: "This AnyHook server does not expose inbox addresses (self-hosted or outdated).",
         app: app.slug,
       });
@@ -551,13 +547,37 @@ export async function handleAppsList(_input: unknown, client: AnyHookClient) {
   }
 }
 
+/**
+ * MCP never hands the agent a destination signing secret. The API shows a new
+ * one once to an API key (the user's own script) and to nobody else, so a tool
+ * result is cleaned of it here, and the note says where the user gets it.
+ */
+function withoutSigningSecrets(result: unknown, client: AnyHookClient, lead = ""): unknown {
+  const strip = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(strip);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(Object.entries(value)
+      .filter(([key, v]) => !((key === "signing_secret" || key === "new_signing_secret") && typeof v === "string" && v !== ""))
+      .map(([key, v]) => [key, strip(v)]));
+  };
+  const cleaned = strip(result);
+  if (JSON.stringify(cleaned) === JSON.stringify(result)) return result;
+  const slug = (result as { app?: { slug?: unknown } } | null)?.app?.slug;
+  const page = client.dashboardUrl(typeof slug === "string" ? `/dashboard/apps/${encodeURIComponent(slug)}` : "/dashboard/apps");
+  return {
+    ...(cleaned as Record<string, unknown>),
+    note: `${lead}The destination's signing secret stays out of this conversation. The user gets it on ${page}: ` +
+      "Rotate on the destination shows a new one once, to verify the AnyHook-Signature header with on the receiving server.",
+  };
+}
+
 export async function handleAppsCreate(
   input: { name: string; source?: string; destinations?: { url: string }[] },
   client: AnyHookClient
 ) {
   try {
     const result = await client.createApp(input);
-    return asTextContent(result);
+    return asTextContent(withoutSigningSecrets(result, client));
   } catch (err) {
     return asApiError(err);
   }
@@ -565,19 +585,39 @@ export async function handleAppsCreate(
 
 export async function handleDestinationAdd(input: { appSlug: string; url: string }, client: AnyHookClient) {
   try {
-    return asTextContent(await client.addDestination(input.appSlug, input.url));
+    const result = await client.addDestination(input.appSlug, input.url);
+    return asTextContent(withoutSigningSecrets(result, client, "New events reach this URL within about a minute. "));
   } catch (err) {
     return asApiError(err);
   }
 }
 
+/**
+ * The provider's key goes from the user into the dashboard, never through the
+ * agent: this hands over the app's page, where they paste it, creating the app
+ * first when there is none.
+ */
 export async function handleConnect(
-  input: { provider_key: string; appSlug?: string; target?: string },
+  input: { provider?: "stripe" | "github"; appSlug?: string },
   client: AnyHookClient
 ) {
   try {
-    const result = await client.connect({ key: input.provider_key, app: input.appSlug, target: input.target });
-    return asTextContent(result);
+    let slug = input.appSlug;
+    let created: unknown;
+    if (!slug) {
+      created = await client.createApp({ name: input.provider === "github" ? "GitHub" : "Stripe" });
+      slug = (created as { app?: { slug?: string } }).app?.slug;
+      if (!slug) return asApiError(new Error("The new app came back without a slug."));
+    }
+    return asTextContent({
+      ...(created ? { created: withoutSigningSecrets(created, client) } : {}),
+      connect_url: client.dashboardUrl(`/dashboard/apps/${encodeURIComponent(slug)}#connect`),
+      next:
+        "Ask the user to open connect_url and paste a key under \"Register this URL with Stripe or GitHub\": a Stripe restricted key " +
+        "with Webhook Endpoints = Write, or a fine-grained GitHub token with Webhooks = Read and write. AnyHook registers the app's " +
+        "inbound URL at the provider, saves the signing secret it yields and turns on signature verification. The key goes from the " +
+        "user to AnyHook, never through this conversation, and is not stored. anyhook_events shows the first event once it is connected.",
+    });
   } catch (err) {
     return asApiError(err);
   }
@@ -604,12 +644,13 @@ export async function handleCodeGet(input: { appSlug: string }, client: AnyHookC
 }
 
 export async function handleCodeDeploy(
-  input: { appSlug: string; code: string; secrets?: Record<string, string | null>; schedule?: string | null; enabled?: boolean },
+  input: { appSlug: string; code: string; schedule?: string | null; enabled?: boolean },
   client: AnyHookClient
 ) {
   try {
+    // Never secrets: the user sets those in the dashboard, and the code reads them as env.NAME.
     return asTextContent(
-      await client.putCode(input.appSlug, { code: input.code, secrets: input.secrets, schedule: input.schedule, enabled: input.enabled })
+      await client.putCode(input.appSlug, { code: input.code, schedule: input.schedule, enabled: input.enabled })
     );
   } catch (err) {
     return asApiError(err);
@@ -664,19 +705,17 @@ export async function handleQuickstart(
     });
     const body = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
-      return asTextContent({ error: body?.error ?? `quickstart failed (${res.status})` });
+      return asErrorContent({ error: body?.error ?? `quickstart failed (${res.status})` });
     }
     return asTextContent({
       ...body,
       mcp_note:
-        "This MCP session is now connected to the new account, remote tools " +
-        "(anyhook_events, anyhook_apps_create, ...) work immediately. To persist " +
-        "across sessions, set ANYHOOK_API_KEY to the api_key above in your MCP " +
-        "config. IMPORTANT, before this session ends, tell your user: this " +
-        "workspace self-deletes in 7 days (inbound URL, key, and events included) " +
-        "unless claimed. Claiming is one free browser sign-in at claim_url and " +
-        "keeps the URL and the API key permanently; events stay for the plan's " +
-        "retention period. Offer them the link.",
+        "Give the sender inbound_url. AnyHook keeps receiving after this process exits. " +
+        "This session is connected: list deliveries with anyhook_events, then read one payload with anyhook_inspect. " +
+        "During the trial, keep the api_key in your MCP client's secret configuration as ANYHOOK_API_KEY to resume. " +
+        "Keep the key out of chat replies and sender configuration. Give the owner claim_url privately before expires_at " +
+        "to keep the same URL beyond the 7-day trial. Claiming revokes trial keys by default. " +
+        "After claiming, sign in to hosted MCP with the claiming account or configure a new key from that account.",
     });
   } catch (err) {
     return asApiError(err);

@@ -226,7 +226,7 @@ async function open(
       }
       // An account whose last app was deleted falls through to a new temporary URL.
       if (!gone && statusOf(err) !== 401) throw err;
-      print("Your temporary URL has expired, so this is a new one.\n");
+      print("The saved credentials can no longer open this inbox. Starting a new temporary URL. If you claimed the original, set ANYHOOK_API_KEY to a key from that account to reconnect.\n");
     }
   }
 

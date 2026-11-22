@@ -6,13 +6,14 @@
  * routing, response serialization) actually works.
  */
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createAnyHookMcpServer } from "./server";
+import type { ServerOptions } from "./server";
 
-async function setupClient() {
-  const server = createAnyHookMcpServer();
+async function setupClient(opts?: ServerOptions) {
+  const server = createAnyHookMcpServer(opts);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 
@@ -47,6 +48,49 @@ function runCard(html: string) {
 }
 
 describe("MCP server integration", () => {
+  it("lets a user discover the inbox recap before connecting and read it after a stdio quickstart", async () => {
+    const { client } = await setupClient({ config: { mode: "local", apiBase: "https://inbox.example" } });
+    const name = "webhook-inbox-catch-up";
+    const request = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ inbound_url: "https://in.example/orders", api_key: "test-key" }, { status: 201 }),
+    );
+    try {
+      expect(client.getInstructions()).toContain("which deliveries need attention?");
+      expect((await client.listPrompts()).prompts).toContainEqual(expect.objectContaining({
+        name, arguments: [expect.objectContaining({ name: "appSlug", required: false })],
+      }));
+      const offline = await client.getPrompt({ name });
+      expect(offline.messages[0].content).toMatchObject({ text: expect.stringContaining("existing ANYHOOK_API_KEY") });
+      expect(request).not.toHaveBeenCalled();
+
+      await client.callTool({ name: "anyhook_quickstart", arguments: {} });
+      const connected = await client.getPrompt({ name, arguments: { appSlug: "orders" } });
+      expect(connected.messages[0].content).toMatchObject({ text: expect.stringContaining('app "orders" in this account') });
+      const all = await client.getPrompt({ name, arguments: { appSlug: "" } });
+      expect(all.messages[0].content).toMatchObject({ text: expect.stringContaining("the apps in this account") });
+      await expect(client.getPrompt({ name, arguments: { appSlug: "orders\nother instructions" } })).rejects.toThrow(/invalid arguments/i);
+      expect(request).toHaveBeenCalledTimes(1);
+    } finally {
+      request.mockRestore();
+      await client.close();
+    }
+  });
+
+  it("advertises and serves the current events card under its new cache URI", async () => {
+    const { client } = await setupClient();
+    const { tools } = await client.listTools();
+    const { resources } = await client.listResources();
+    const card = resources.find((r) => r.name === "anyhook-events-card");
+    const uri = "ui://anyhook/events-v5.html";
+
+    expect(tools.find((t) => t.name === "anyhook_events")?._meta).toMatchObject({ ui: { resourceUri: uri } });
+    expect(card?.uri).toBe(uri);
+    const { contents } = await client.readResource({ uri });
+    expect(contents[0].uri).toBe(uri);
+    expect(contents[0].mimeType).toBe("text/html;profile=mcp-app");
+    expect((contents[0] as { text: string }).text).toContain("stored only");
+  });
+
   it("the events card introduces itself and reports its height, or claude.ai never shows it", async () => {
     const { client } = await setupClient();
     const { resources } = await client.listResources();
@@ -71,6 +115,26 @@ describe("MCP server integration", () => {
     });
     expect(card.root.innerHTML).toContain("chip failed");
     expect(card.root.innerHTML).toContain("&lt;b&gt;x");
+  });
+
+  it("does not present stored-only or unknown events as forwarded", async () => {
+    const { client } = await setupClient();
+    const { resources } = await client.listResources();
+    const { contents } = await client.readResource({ uri: resources.find((r) => r.name === "anyhook-events-card")!.uri });
+    const card = runCard((contents[0] as { text: string }).text);
+    card.fromHost({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: { events: [
+        { id: "one", status: "success", deliveryState: "stored", outboundStatus: 0 },
+        { id: "two", status: "success", deliveryState: "forwarded", outboundStatus: 200 },
+        { id: "three", status: "success", deliveryState: "unknown", outboundStatus: null },
+        { id: "four", status: "success", outboundStatus: 0 },
+      ] } },
+    });
+    expect(card.root.innerHTML.match(/>stored only<\/span>/g)).toHaveLength(2);
+    expect(card.root.innerHTML).toContain('chip ok">forwarded');
+    expect(card.root.innerHTML).toContain('chip ">unconfirmed');
   });
 
   it("exposes all 19 anyhook_* tools via listTools (account tools guarded, not hidden)", async () => {
@@ -113,6 +177,43 @@ describe("MCP server integration", () => {
     const result = await client.callTool({ name: "anyhook_providers", arguments: {} });
     const data = parseToolResult(result) as { providers: Array<{ provider: string; events: string[] }> };
     expect(data.providers.map((p) => p.provider).sort()).toEqual(["github", "slack", "stripe"]);
+  });
+
+  it("a fresh MCP client resumes its inbox through REST with the saved key, filters, and page cursor", async () => {
+    const apiBase = "https://inbox.example";
+    const apiKey = "test-key";
+    const when = "2026-11-19T08:00:00.123456Z";
+    const cursor = `${when}_94fbc375-d092-42d3-a956-99cd1c09726c`;
+    const request = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/v1/quickstart") {
+        return Response.json({ inbound_url: "https://in.example/demo", api_key: apiKey }, { status: 201 });
+      }
+      const headers = new Headers(init?.headers);
+      expect(headers.get("authorization")).toBe(`Bearer ${apiKey}`);
+      if (url.pathname === "/api/v1/events/e1") {
+        expect(headers.get("x-anyhook-tool")).toBe("anyhook_inspect");
+        return Response.json({ event: { id: "e1", inboundBody: { message: "arrived while offline" } } });
+      }
+      expect(headers.get("x-anyhook-tool")).toBe("anyhook_events");
+      expect(url.searchParams.get("app_slug")).toBe("demo");
+      expect(url.searchParams.get("since")).toBe(when);
+      expect(url.searchParams.get("cursor")).toBe(cursor);
+      return Response.json({ events: [{ id: "e1" }], nextCursor: null });
+    });
+    try {
+      const first = await setupClient({ config: { apiBase, mode: "local" } });
+      const created = parseToolResult(await first.client.callTool({ name: "anyhook_quickstart", arguments: {} })) as { api_key: string };
+      await first.client.close();
+      const second = await setupClient({ config: { apiBase, mode: "remote", apiKey: created.api_key } });
+      const list = await second.client.callTool({ name: "anyhook_events", arguments: { since: when, cursor, appSlug: "demo" } });
+      expect(list.structuredContent).toEqual({ events: [{ id: "e1" }], nextCursor: null });
+      const detail = await second.client.callTool({ name: "anyhook_inspect", arguments: { id: "e1" } });
+      expect(parseToolResult(detail)).toMatchObject({ inboundBody: { message: "arrived while offline" } });
+      await second.client.close();
+    } finally {
+      request.mockRestore();
+    }
   });
 
   it("anyhook_mock + anyhook_verify round-trip succeeds", async () => {

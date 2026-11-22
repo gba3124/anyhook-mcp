@@ -51,7 +51,7 @@ export interface EventStoreFilter {
 }
 
 export interface EventStore {
-  list(filter?: EventStoreFilter): Promise<{
+  list(filter?: EventStoreFilter & { cursor?: string }): Promise<{
     events: WebhookEvent[];
     nextCursor: string | null;
   }>;
@@ -108,10 +108,14 @@ export function createMemoryStore(options: MemoryStoreOptions = {}): EventStore 
       return events.get(id) ?? null;
     },
 
-    async list(filter?: EventStoreFilter): Promise<{ events: WebhookEvent[]; nextCursor: string | null }> {
+    async list(filter?: EventStoreFilter & { cursor?: string }): Promise<{ events: WebhookEvent[]; nextCursor: string | null }> {
+      const before = filter?.cursor ? events.get(filter.cursor) : undefined;
+      if (filter?.cursor && !before) throw new Error("This cursor is no longer in the local event store. List from the beginning.");
+      const newestFirst = (a: WebhookEvent, b: WebhookEvent) =>
+        b.receivedAt.getTime() - a.receivedAt.getTime() || b.id.localeCompare(a.id);
       const all = Array.from(events.values())
-        .filter((e) => matchesFilter(e, filter))
-        .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
+        .filter((e) => matchesFilter(e, filter) && (!before || newestFirst(e, before) > 0))
+        .sort(newestFirst);
 
       const limit = filter?.limit ?? DEFAULT_LIMIT;
       const sliced = all.slice(0, limit);
